@@ -1,0 +1,25 @@
+========================================
+   ENVIRONMENT VARIABLES FOR RENDER
+========================================
+
+Copy các dòng sau vào Render Web Service → Environment Variables:
+
+DATABASE_URL=jdbc:postgresql://dpg-d5ghme15pdvs73cmb160-a:5432/tram_doc_db
+DATABASE_USERNAME=tram_doc_user
+DATABASE_PASSWORD=Y9HMWzRpzcUdrfRmlNhsQRmi9f8DQoBV
+SPRING_PROFILE=postgres
+DDL_AUTO=update
+FLYWAY_ENABLED=false
+JWT_SECRET=hdyw:MLNcs83'gF?">)<7uvaVTmp9O/;P.UtJnxj@%erX2=GZ&b!4iRo6Eq$QHIA
+CORS_ORIGINS=*
+LOG_LEVEL=INFO
+LOG_LEVEL_APP=INFO
+
+========================================
+
+LƯU Ý:
+1. Thay JWT_SECRET bằng secret key mạnh hơn (dùng script hoặc online generator)
+2. Nếu có frontend domain cụ thể, thay CORS_ORIGINS=* bằng domain đó
+3. Sau khi set xong, click "Save Changes" và Render sẽ tự động redeploy
+
+========================================
