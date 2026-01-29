@@ -13,6 +13,8 @@ import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
+import 'screens/auth/otp_verification_screen.dart';
+import 'screens/auth/reset_password_screen.dart';
 import 'screens/main_wrapper.dart';
 import 'screens/home/home_dashboard.dart';
 import 'screens/library/my_library_screen.dart';
@@ -34,6 +36,16 @@ import 'screens/social/friend_profile_screen.dart';
 import 'screens/social/find_friend_screen.dart';
 import 'screens/settings/settings_screen.dart';
 import 'screens/settings/notification_settings_screen.dart';
+import 'screens/settings/change_password_screen.dart';
+import 'screens/settings/privacy_settings_screen.dart';
+import 'screens/settings/language_settings_screen.dart';
+import 'screens/settings/reading_goal_screen.dart';
+import 'screens/settings/reading_reminder_screen.dart';
+import 'screens/settings/flashcard_settings_screen.dart';
+import 'screens/settings/data_management_screen.dart';
+import 'screens/settings/about_screen.dart';
+import 'screens/settings/terms_screen.dart';
+import 'screens/settings/help_support_screen.dart';
 
 
 class AppRouter {
@@ -51,7 +63,9 @@ class AppRouter {
         final authState = authBloc.state;
         final isOnAuthScreen = state.matchedLocation == '/login' ||
             state.matchedLocation == '/register' ||
-            state.matchedLocation == '/forgot-password';
+            state.matchedLocation == '/forgot-password' ||
+            state.matchedLocation.startsWith('/auth/verify-otp') ||
+            state.matchedLocation.startsWith('/auth/reset-password');
         final isOnSplash = state.matchedLocation == '/splash';
         final isOnOnboarding = state.matchedLocation == '/onboarding';
         
@@ -104,6 +118,23 @@ class AppRouter {
         GoRoute(
           path: '/forgot-password',
           builder: (context, state) => const ForgotPasswordScreen(),
+        ),
+        GoRoute(
+          path: '/auth/verify-otp',
+          builder: (context, state) {
+            final email = state.extra as String? ?? '';
+            return OtpVerificationScreen(email: email);
+          },
+        ),
+        GoRoute(
+          path: '/auth/reset-password',
+          builder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>? ?? {};
+            return ResetPasswordScreen(
+              email: extra['email'] ?? '',
+              otp: extra['otp'] ?? '',
+            );
+          },
         ),
         
         // Main App with Bottom Navigation
@@ -257,6 +288,46 @@ class AppRouter {
         GoRoute(
           path: '/settings/notifications',
           builder: (context, state) => const NotificationSettingsScreen(),
+        ),
+        GoRoute(
+          path: '/settings/change-password',
+          builder: (context, state) => const ChangePasswordScreen(),
+        ),
+        GoRoute(
+          path: '/settings/privacy',
+          builder: (context, state) => const PrivacySettingsScreen(),
+        ),
+        GoRoute(
+          path: '/settings/language',
+          builder: (context, state) => const LanguageSettingsScreen(),
+        ),
+        GoRoute(
+          path: '/settings/reading-goal',
+          builder: (context, state) => const ReadingGoalScreen(),
+        ),
+        GoRoute(
+          path: '/settings/reading-reminder',
+          builder: (context, state) => const ReadingReminderScreen(),
+        ),
+        GoRoute(
+          path: '/settings/flashcard',
+          builder: (context, state) => const FlashcardSettingsScreen(),
+        ),
+        GoRoute(
+          path: '/settings/data',
+          builder: (context, state) => const DataManagementScreen(),
+        ),
+        GoRoute(
+          path: '/settings/about',
+          builder: (context, state) => const AboutScreen(),
+        ),
+        GoRoute(
+          path: '/settings/terms',
+          builder: (context, state) => const TermsScreen(),
+        ),
+        GoRoute(
+          path: '/settings/help',
+          builder: (context, state) => const HelpSupportScreen(),
         ),
         
         // Focus Mode
