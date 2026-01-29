@@ -10,9 +10,47 @@ import '../../theme/colors.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/auth/auth_event.dart';
 import '../../blocs/theme/theme_cubit.dart';
+import '../../services/settings_service.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final SettingsService _settingsService = SettingsService();
+  
+  int _readingGoal = 24;
+  int _cardsPerSession = 20;
+  String _language = 'vi';
+  TimeOfDay _readingTime = const TimeOfDay(hour: 20, minute: 0);
+  TimeOfDay _reviewTime = const TimeOfDay(hour: 9, minute: 0);
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+  
+  Future<void> _loadSettings() async {
+    final goal = await _settingsService.getReadingGoal();
+    final cards = await _settingsService.getCardsPerSession();
+    final lang = await _settingsService.getLanguage();
+    final readingTimeMap = await _settingsService.getReadingReminderTime();
+    final reviewTimeMap = await _settingsService.getReviewReminderTime();
+    
+    if (mounted) {
+      setState(() {
+        _readingGoal = goal;
+        _cardsPerSession = cards;
+        _language = lang;
+        _readingTime = TimeOfDay(hour: readingTimeMap['hour']!, minute: readingTimeMap['minute']!);
+        _reviewTime = TimeOfDay(hour: reviewTimeMap['hour']!, minute: reviewTimeMap['minute']!);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,14 +83,14 @@ class SettingsScreen extends StatelessWidget {
             _buildSettingItem(
               icon: Icons.lock_outline,
               title: 'Đổi mật khẩu',
-              onTap: () {},
+              onTap: () => context.push('/settings/change-password'),
               isDark: isDark,
             ),
             _buildDivider(),
             _buildSettingItem(
               icon: Icons.privacy_tip_outlined,
               title: 'Quyền riêng tư',
-              onTap: () {},
+              onTap: () => context.push('/settings/privacy'),
               isDark: isDark,
             ),
           ], isDark),
@@ -83,8 +121,11 @@ class SettingsScreen extends StatelessWidget {
             _buildSettingItem(
               icon: Icons.language_outlined,
               title: 'Ngôn ngữ',
-              subtitle: 'Tiếng Việt',
-              onTap: () {},
+              subtitle: _language == 'vi' ? 'Tiếng Việt' : 'English',
+              onTap: () async {
+                await context.push('/settings/language');
+                _loadSettings();
+              },
               isDark: isDark,
             ),
           ], isDark),
@@ -97,16 +138,22 @@ class SettingsScreen extends StatelessWidget {
             _buildSettingItem(
               icon: Icons.flag_outlined,
               title: 'Mục tiêu năm',
-              subtitle: '24 cuốn sách',
-              onTap: () {},
+              subtitle: '$_readingGoal cuốn sách',
+              onTap: () async {
+                await context.push('/settings/reading-goal');
+                _loadSettings();
+              },
               isDark: isDark,
             ),
             _buildDivider(),
             _buildSettingItem(
               icon: Icons.timer_outlined,
               title: 'Nhắc nhở đọc',
-              subtitle: '20:00 mỗi ngày',
-              onTap: () {},
+              subtitle: '${_readingTime.format(context)} mỗi ngày',
+              onTap: () async {
+                await context.push('/settings/reading-reminder');
+                _loadSettings();
+              },
               isDark: isDark,
             ),
           ], isDark),
@@ -118,17 +165,12 @@ class SettingsScreen extends StatelessWidget {
           _buildSettingCard([
             _buildSettingItem(
               icon: Icons.style_outlined,
-              title: 'Số thẻ mỗi phiên',
-              subtitle: '20 thẻ',
-              onTap: () {},
-              isDark: isDark,
-            ),
-            _buildDivider(),
-            _buildSettingItem(
-              icon: Icons.access_time,
-              title: 'Nhắc nhở ôn tập',
-              subtitle: '09:00 mỗi ngày',
-              onTap: () {},
+              title: 'Cài đặt Flashcard',
+              subtitle: '$_cardsPerSession thẻ/phiên • ${_reviewTime.format(context)}',
+              onTap: () async {
+                await context.push('/settings/flashcard');
+                _loadSettings();
+              },
               isDark: isDark,
             ),
           ], isDark),
@@ -139,23 +181,10 @@ class SettingsScreen extends StatelessWidget {
           _buildSectionHeader('Dữ liệu', isDark),
           _buildSettingCard([
             _buildSettingItem(
-              icon: Icons.cloud_upload_outlined,
-              title: 'Sao lưu dữ liệu',
-              onTap: () {},
-              isDark: isDark,
-            ),
-            _buildDivider(),
-            _buildSettingItem(
-              icon: Icons.cloud_download_outlined,
-              title: 'Khôi phục dữ liệu',
-              onTap: () {},
-              isDark: isDark,
-            ),
-            _buildDivider(),
-            _buildSettingItem(
-              icon: Icons.download_outlined,
-              title: 'Xuất dữ liệu',
-              onTap: () {},
+              icon: Icons.folder_outlined,
+              title: 'Quản lý dữ liệu',
+              subtitle: 'Sao lưu, khôi phục, xuất dữ liệu',
+              onTap: () => context.push('/settings/data'),
               isDark: isDark,
             ),
           ], isDark),
@@ -168,21 +197,21 @@ class SettingsScreen extends StatelessWidget {
             _buildSettingItem(
               icon: Icons.info_outline,
               title: 'Về Trạm Đọc',
-              onTap: () {},
+              onTap: () => context.push('/settings/about'),
               isDark: isDark,
             ),
             _buildDivider(),
             _buildSettingItem(
               icon: Icons.description_outlined,
               title: 'Điều khoản sử dụng',
-              onTap: () {},
+              onTap: () => context.push('/settings/terms'),
               isDark: isDark,
             ),
             _buildDivider(),
             _buildSettingItem(
               icon: Icons.help_outline,
               title: 'Trợ giúp & Hỗ trợ',
-              onTap: () {},
+              onTap: () => context.push('/settings/help'),
               isDark: isDark,
             ),
           ], isDark),
