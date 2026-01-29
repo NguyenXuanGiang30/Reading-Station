@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "844562415563",
+    "project_id": "reading-station-485803",
+    "storage_bucket": "reading-station-485803.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:844562415563:android:1c6e7927f1187f51f6004e",
+        "android_client_info": {
+          "package_name": "com.example.frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCXXSKKd8SRDq0qzL6PMLGPdgrjmIR5cy0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
