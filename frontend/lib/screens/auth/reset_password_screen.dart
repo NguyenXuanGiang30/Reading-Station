@@ -1,4 +1,4 @@
-/// ForgotPasswordScreen - Nhập email để nhận OTP
+/// ResetPasswordScreen - Đặt lại mật khẩu sau khi xác thực OTP
 library;
 
 import 'package:flutter/material.dart';
@@ -8,47 +8,59 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../theme/colors.dart';
 import '../../services/api_service.dart';
 
-class ForgotPasswordScreen extends StatefulWidget {
-  const ForgotPasswordScreen({super.key});
+class ResetPasswordScreen extends StatefulWidget {
+  final String email;
+  final String otp;
+  
+  const ResetPasswordScreen({
+    super.key,
+    required this.email,
+    required this.otp,
+  });
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _sendOtp() async {
+  Future<void> _resetPassword() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
       final api = ApiService();
-      await api.post('/auth/forgot-password', data: {
-        'email': _emailController.text.trim(),
+      await api.post('/auth/reset-password', data: {
+        'email': widget.email,
+        'otp': widget.otp,
+        'newPassword': _passwordController.text,
+        'confirmPassword': _confirmPasswordController.text,
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Mã OTP đã được gửi đến email của bạn',
-              style: GoogleFonts.inter(),
-            ),
+            content: Text('Đặt lại mật khẩu thành công!', style: GoogleFonts.inter()),
             backgroundColor: AppColors.success,
           ),
         );
-        // Navigate to OTP verification screen
-        context.push('/auth/verify-otp', extra: _emailController.text.trim());
+        // Navigate to login
+        context.go('/login');
       }
     } catch (e) {
       if (mounted) {
@@ -93,20 +105,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: AppColors.primaryStart.withValues(alpha: 0.1),
+                    color: AppColors.success.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Icon(
-                    Icons.lock_reset,
+                  child: const Icon(
+                    Icons.lock_open,
                     size: 40,
-                    color: AppColors.primaryStart,
+                    color: AppColors.success,
                   ),
                 ),
 
                 const SizedBox(height: 32),
 
                 Text(
-                  'Quên mật khẩu?',
+                  'Đặt mật khẩu mới',
                   style: GoogleFonts.playfairDisplay(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
@@ -117,7 +129,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 const SizedBox(height: 12),
 
                 Text(
-                  'Nhập email đã đăng ký, chúng tôi sẽ gửi mã OTP để đặt lại mật khẩu.',
+                  'Tạo mật khẩu mới cho tài khoản của bạn.',
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
@@ -127,15 +139,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
                 const SizedBox(height: 40),
 
-                // Email field
+                // Password field
                 TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  autocorrect: false,
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
                   decoration: InputDecoration(
-                    labelText: 'Email',
-                    hintText: 'example@gmail.com',
-                    prefixIcon: const Icon(Icons.email_outlined),
+                    labelText: 'Mật khẩu mới',
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -155,10 +169,60 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Vui lòng nhập email';
+                      return 'Vui lòng nhập mật khẩu mới';
                     }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                      return 'Email không hợp lệ';
+                    if (value.length < 6) {
+                      return 'Mật khẩu phải có ít nhất 6 ký tự';
+                    }
+                    if (!RegExp(r'^[A-Z]').hasMatch(value)) {
+                      return 'Chữ cái đầu tiên phải viết hoa';
+                    }
+                    if (!RegExp(r'[0-9]').hasMatch(value)) {
+                      return 'Mật khẩu phải chứa ít nhất một số';
+                    }
+                    if (!RegExp(r'[!@#\$%^&*()_+\-=\[\]{};'':",./<>?~`]').hasMatch(value)) {
+                      return 'Mật khẩu phải chứa ký tự đặc biệt';
+                    }
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 20),
+
+                // Confirm password field
+                TextFormField(
+                  controller: _confirmPasswordController,
+                  obscureText: _obscureConfirm,
+                  decoration: InputDecoration(
+                    labelText: 'Xác nhận mật khẩu',
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: AppColors.primaryStart,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Vui lòng xác nhận mật khẩu';
+                    }
+                    if (value != _passwordController.text) {
+                      return 'Mật khẩu xác nhận không khớp';
                     }
                     return null;
                   },
@@ -171,7 +235,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _isLoading ? null : _sendOtp,
+                    onPressed: _isLoading ? null : _resetPassword,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryStart,
                       shape: RoundedRectangleBorder(
@@ -188,29 +252,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             ),
                           )
                         : Text(
-                            'Gửi mã OTP',
+                            'Đặt lại mật khẩu',
                             style: GoogleFonts.inter(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                               color: Colors.white,
                             ),
                           ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Back to login
-                Center(
-                  child: TextButton(
-                    onPressed: () => context.pop(),
-                    child: Text(
-                      'Quay lại đăng nhập',
-                      style: GoogleFonts.inter(
-                        color: AppColors.primaryStart,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
                   ),
                 ),
               ],

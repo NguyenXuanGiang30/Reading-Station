@@ -213,6 +213,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     if (value.length < 6) {
                       return 'Mật khẩu phải có ít nhất 6 ký tự';
                     }
+                    if (!RegExp(r'^[A-Z]').hasMatch(value)) {
+                      return 'Chữ cái đầu tiên phải viết hoa';
+                    }
+                    if (!RegExp(r'[0-9]').hasMatch(value)) {
+                      return 'Mật khẩu phải chứa ít nhất một số';
+                    }
+                    if (!RegExp(r'[!@#\$%^&*()_+\-=\[\]{};'':",./<>?~`]').hasMatch(value)) {
+                      return 'Mật khẩu phải chứa ký tự đặc biệt';
+                    }
                     return null;
                   },
                 ),
