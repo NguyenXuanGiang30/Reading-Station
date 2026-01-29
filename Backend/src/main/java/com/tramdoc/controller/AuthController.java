@@ -1,10 +1,14 @@
 package com.tramdoc.controller;
 
+import com.tramdoc.dto.request.ChangePasswordRequest;
 import com.tramdoc.dto.request.FacebookLoginRequest;
+import com.tramdoc.dto.request.ForgotPasswordRequest;
 import com.tramdoc.dto.request.GoogleLoginRequest;
 import com.tramdoc.dto.request.LoginRequest;
 import com.tramdoc.dto.request.RefreshTokenRequest;
 import com.tramdoc.dto.request.RegisterRequest;
+import com.tramdoc.dto.request.ResetPasswordRequest;
+import com.tramdoc.dto.request.VerifyOtpRequest;
 import com.tramdoc.dto.response.AuthResponse;
 import com.tramdoc.service.AuthService;
 import com.tramdoc.service.OAuth2Service;
@@ -15,6 +19,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -60,6 +66,37 @@ public class AuthController {
     public ResponseEntity<AuthResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
         AuthResponse response = authService.refreshToken(request.getRefreshToken());
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/change-password")
+    @Operation(summary = "Change password", description = "Change current user's password")
+    public ResponseEntity<Map<String, String>> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(request);
+        return ResponseEntity.ok(Map.of("message", "Đổi mật khẩu thành công"));
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Forgot password", description = "Send OTP to email for password reset")
+    public ResponseEntity<Map<String, String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+        return ResponseEntity.ok(Map.of(
+                "message", "Nếu email tồn tại, mã OTP sẽ được gửi đến email của bạn"));
+    }
+
+    @PostMapping("/verify-otp")
+    @Operation(summary = "Verify OTP", description = "Verify OTP code for password reset")
+    public ResponseEntity<Map<String, Object>> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        boolean valid = authService.verifyOtp(request);
+        return ResponseEntity.ok(Map.of(
+                "valid", valid,
+                "message", "Mã OTP hợp lệ"));
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Reset password", description = "Reset password using OTP")
+    public ResponseEntity<Map<String, String>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok(Map.of("message", "Đặt lại mật khẩu thành công"));
     }
 
     @PostMapping("/logout")
