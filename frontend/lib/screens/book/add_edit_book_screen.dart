@@ -9,6 +9,9 @@ import '../../theme/colors.dart';
 import '../../models/book.dart';
 import '../../services/user_book_service.dart';
 import '../../services/book_service.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class AddEditBookScreen extends StatefulWidget {
   final String? bookId;
@@ -33,6 +36,9 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
   
   ReadingStatus _status = ReadingStatus.wantToRead;
   String? _category;
+  String? _coverUrl;
+  File? _selectedImage;
+  final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
   
   bool get isEditing => widget.bookId != null;
@@ -98,6 +104,8 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
         if (!_categories.contains(_category)) {
            _category = null; // or add to list dynamically
         }
+        
+        _coverUrl = book['coverUrl'];
       }
     } catch (e) {
       if (mounted) {
@@ -129,6 +137,9 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
           if (bookData['category'] != null && _categories.contains(bookData['category'])) {
             _category = bookData['category'];
           }
+          if (bookData['coverUrl'] != null) {
+            _coverUrl = bookData['coverUrl'];
+          }
         });
       }
     } catch (e) {
@@ -148,6 +159,23 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
     _descriptionController.dispose();
     _locationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImage = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi chọn ảnh: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
   }
 
   Future<void> _saveBook() async {
@@ -175,10 +203,21 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
           isbn: _isbnController.text.isNotEmpty ? _isbnController.text : null,
           publisher: _publisherController.text.isNotEmpty ? _publisherController.text : null,
           category: _category,
+          coverUrl: _coverUrl, // Pass coverUrl if available from API/ISBN
           description: _descriptionController.text.isNotEmpty ? _descriptionController.text : null,
           location: _locationController.text.isNotEmpty ? _locationController.text : null,
           totalPages: int.tryParse(_pagesController.text),
         );
+      }
+      
+      // Warning if local image was selected but couldn't be uploaded
+      if (_selectedImage != null && mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+           const SnackBar(
+             content: Text('Lưu ý: Ảnh tải lên chưa được hỗ trợ, chỉ lưu thông tin sách'),
+             backgroundColor: Colors.orange,
+           ),
+         );
       }
       
       if (mounted) {
@@ -245,37 +284,73 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
             // Book cover placeholder
             Center(
               child: GestureDetector(
-                onTap: () {
-                  // TODO: Pick image
-                },
-                child: Container(
-                  width: 120,
-                  height: 180,
-                  decoration: BoxDecoration(
-                    color: isDark ? AppColors.cardDark : Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.grey.shade300,
-                      style: BorderStyle.solid,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                onTap: _pickImage,
+                  child: Stack(
                     children: [
-                      Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey.shade400),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Thêm ảnh bìa',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: Colors.grey,
+                      Container(
+                        width: 120,
+                        height: 180,
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.cardDark : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.shade300,
+                            style: BorderStyle.solid,
+                          ),
+                          image: _selectedImage != null
+                              ? DecorationImage(
+                                  image: FileImage(_selectedImage!),
+                                  fit: BoxFit.cover,
+                                )
+                              : (_coverUrl != null && _coverUrl!.isNotEmpty
+                                  ? DecorationImage(
+                                      image: CachedNetworkImageProvider(_coverUrl!),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null),
                         ),
+                        child: (_selectedImage == null && (_coverUrl == null || _coverUrl!.isEmpty))
+                            ? Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey.shade400),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Thêm ảnh bìa',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : null,
                       ),
+                      if (_selectedImage != null || (_coverUrl != null && _coverUrl!.isNotEmpty))
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedImage = null;
+                                _coverUrl = null;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.black54,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.close, color: Colors.white, size: 16),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
               ),
-            ),
             
             const SizedBox(height: 24),
             
