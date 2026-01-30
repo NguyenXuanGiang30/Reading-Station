@@ -11,6 +11,7 @@ class Note extends Equatable {
   final int? pageNumber;
   final String? ocrImageUrl;
   final List<String> tags;
+  final bool isFlashcard;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   
@@ -22,6 +23,7 @@ class Note extends Equatable {
     this.pageNumber,
     this.ocrImageUrl,
     this.tags = const [],
+    this.isFlashcard = false,
     this.createdAt,
     this.updatedAt,
   });
@@ -35,6 +37,7 @@ class Note extends Equatable {
       pageNumber: json['pageNumber'] ?? json['page_number'],
       ocrImageUrl: json['ocrImageUrl'] ?? json['ocr_image_url'],
       tags: (json['tags'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+      isFlashcard: json['isFlashcard'] ?? json['is_flashcard'] ?? false,
       createdAt: json['createdAt'] != null 
           ? DateTime.tryParse(json['createdAt']) 
           : null,
@@ -52,6 +55,7 @@ class Note extends Equatable {
       'pageNumber': pageNumber,
       'ocrImageUrl': ocrImageUrl,
       'tags': tags,
+      'isFlashcard': isFlashcard,
     };
   }
   
@@ -63,6 +67,7 @@ class Note extends Equatable {
     int? pageNumber,
     String? ocrImageUrl,
     List<String>? tags,
+    bool? isFlashcard,
   }) {
     return Note(
       id: id ?? this.id,
@@ -72,6 +77,7 @@ class Note extends Equatable {
       pageNumber: pageNumber ?? this.pageNumber,
       ocrImageUrl: ocrImageUrl ?? this.ocrImageUrl,
       tags: tags ?? this.tags,
+      isFlashcard: isFlashcard ?? this.isFlashcard,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );
@@ -79,6 +85,6 @@ class Note extends Equatable {
   
   @override
   List<Object?> get props => [
-    id, userBookId, bookTitle, content, pageNumber, ocrImageUrl, tags
+    id, userBookId, bookTitle, content, pageNumber, ocrImageUrl, tags, isFlashcard
   ];
 }
