@@ -96,6 +96,20 @@ class FlashcardService {
       throw Exception('Không thể tạo flashcard: $e');
     }
   }
+
+  /// Create a flashcard from a note
+  Future<Flashcard?> createCardFromNote(String noteId) async {
+    try {
+      final response = await _api.post('/flashcards/from-note/$noteId');
+      
+      if (response.data != null) {
+        return Flashcard.fromJson(response.data);
+      }
+      return null;
+    } catch (e) {
+      throw Exception('Không thể tạo flashcard từ ghi chú: $e');
+    }
+  }
   
   /// Update flashcard
   Future<Flashcard?> updateCard(String id, {
