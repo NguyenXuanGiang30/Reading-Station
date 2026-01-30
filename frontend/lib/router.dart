@@ -247,7 +247,11 @@ class AppRouter {
           },
         ),
         
-        // Flashcard Session
+        // Flashcard Routes
+        GoRoute(
+          path: '/flashcard/create',
+          builder: (context, state) => const CreateFlashcardScreen(),
+        ),
         GoRoute(
           path: '/flashcard/session',
           builder: (context, state) {
