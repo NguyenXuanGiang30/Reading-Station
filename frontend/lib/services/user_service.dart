@@ -1,6 +1,7 @@
 /// UserService - User profile management
 library;
 
+import 'package:dio/dio.dart';
 import 'api_service.dart';
 
 class UserService {
@@ -92,13 +93,12 @@ class UserService {
   /// Upload avatar image
   Future<String?> uploadAvatar(String imagePath) async {
     try {
-      // TODO: Implement file upload with Dio FormData
-      // final formData = FormData.fromMap({
-      //   'file': await MultipartFile.fromFile(imagePath),
-      // });
-      // final response = await _api.post('/users/avatar', data: formData);
-      // return response.data['avatarUrl'];
-      return null;
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(imagePath),
+      });
+      
+      final response = await _api.post('/upload', data: formData);
+      return response.data['url'];
     } catch (e) {
       throw Exception('Không thể tải ảnh lên: $e');
     }
