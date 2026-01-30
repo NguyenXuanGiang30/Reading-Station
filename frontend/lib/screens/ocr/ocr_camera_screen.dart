@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -23,6 +24,8 @@ class _OCRCameraScreenState extends State<OCRCameraScreen> {
   bool _isInitialized = false;
   bool _isCapturing = false;
   bool _flashOn = false;
+  final ImagePicker _picker = ImagePicker();
+  String? _errorMsg;
 
   @override
   void initState() {
@@ -45,9 +48,16 @@ class _OCRCameraScreenState extends State<OCRCameraScreen> {
             _isInitialized = true;
           });
         }
+      } else {
+        if (mounted) {
+           setState(() => _errorMsg = 'Không tìm thấy camera');
+        }
       }
     } catch (e) {
       debugPrint('Camera init error: $e');
+      if (mounted) {
+         setState(() => _errorMsg = 'Lỗi khởi động camera: $e');
+      }
     }
   }
 
@@ -87,6 +97,17 @@ class _OCRCameraScreenState extends State<OCRCameraScreen> {
     }
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      if (pickedFile != null && mounted) {
+        context.push('/ocr/edit?image=${Uri.encodeComponent(pickedFile.path)}&bookId=${widget.bookId ?? ''}');
+      }
+    } catch (e) {
+      debugPrint('Pick image error: $e');
+    }
+  }
+
   Future<void> _toggleFlash() async {
     if (_controller == null) return;
     
@@ -113,15 +134,22 @@ class _OCRCameraScreenState extends State<OCRCameraScreen> {
               child: CameraPreview(_controller!),
             )
           else
-            const Center(
-              child: CircularProgressIndicator(color: Colors.white),
+            Center(
+              child: _errorMsg != null 
+                  ? Text(_errorMsg!, style: const TextStyle(color: Colors.white))
+                  : const CircularProgressIndicator(color: Colors.white),
             ),
           
           // Overlay with focus area
           _buildOverlay(),
           
           // Top bar
-          _buildTopBar(),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: _buildTopBar(),
+          ),
           
           // Bottom controls
           _buildBottomControls(),
@@ -137,7 +165,7 @@ class _OCRCameraScreenState extends State<OCRCameraScreen> {
           // Top dark area
           Expanded(
             flex: 2,
-            child: Container(color: Colors.black.withValues(alpha: 0.5)),
+            child: Container(color: Colors.black.withOpacity(0.5)),
           ),
           
           // Focus area
@@ -155,7 +183,7 @@ class _OCRCameraScreenState extends State<OCRCameraScreen> {
                   child: Text(
                     'Đặt văn bản trong khung',
                     style: GoogleFonts.inter(
-                      color: Colors.white.withValues(alpha: 0.7),
+                      color: Colors.white.withOpacity(0.7),
                       fontSize: 14,
                     ),
                   ),
@@ -167,7 +195,7 @@ class _OCRCameraScreenState extends State<OCRCameraScreen> {
           // Bottom dark area
           Expanded(
             flex: 3,
-            child: Container(color: Colors.black.withValues(alpha: 0.5)),
+            child: Container(color: Colors.black.withOpacity(0.5)),
           ),
         ],
       ),
@@ -186,7 +214,7 @@ class _OCRCameraScreenState extends State<OCRCameraScreen> {
               icon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.5),
+                  color: Colors.black.withOpacity(0.5),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.close, color: Colors.white),
@@ -205,7 +233,7 @@ class _OCRCameraScreenState extends State<OCRCameraScreen> {
               icon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.5),
+                  color: Colors.black.withOpacity(0.5),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -234,14 +262,14 @@ class _OCRCameraScreenState extends State<OCRCameraScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.5),
+                  color: Colors.black.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   '💡 Đảm bảo đủ ánh sáng và văn bản rõ ràng',
                   style: GoogleFonts.inter(
                     fontSize: 12,
-                    color: Colors.white.withValues(alpha: 0.8),
+                    color: Colors.white.withOpacity(0.8),
                   ),
                 ),
               ),
@@ -255,9 +283,7 @@ class _OCRCameraScreenState extends State<OCRCameraScreen> {
                   // Gallery button
                   _buildControlButton(
                     icon: Icons.photo_library,
-                    onTap: () {
-                      // TODO: Pick from gallery
-                    },
+                    onTap: _pickImage,
                   ),
                   
                   // Capture button
@@ -307,7 +333,7 @@ class _OCRCameraScreenState extends State<OCRCameraScreen> {
         width: 48,
         height: 48,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.2),
+          color: Colors.white.withOpacity(0.2),
           shape: BoxShape.circle,
         ),
         child: Icon(icon, color: Colors.white),
