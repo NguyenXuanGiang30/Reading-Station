@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../theme/colors.dart';
 import '../../services/user_service.dart';
@@ -160,12 +161,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               right: 0,
                               bottom: 0,
                               child: GestureDetector(
-                                onTap: () {
-                                  // TODO: Implement avatar upload with _userService.uploadAvatar
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Tính năng đang phát triển')),
-                                  );
-                                },
+                                onTap: _pickAndUploadAvatar,
                                 child: Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
@@ -231,6 +227,55 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ),
     );
+  }
+
+  Future<void> _pickAndUploadAvatar() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      
+      if (image == null) return;
+      
+      setState(() => _isLoading = true);
+      
+      final url = await _userService.uploadAvatar(image.path);
+      
+      if (url != null) {
+        // Update profile with new avatar URL
+        await _userService.updateProfile(avatarUrl: url);
+        
+        // Refresh local user data via Bloc
+        if (mounted) {
+          // Trigger a refresh of the auth state/user profile
+          // Since we don't have a direct "refresh" event in AuthBloc visible here, 
+          // we rely on the fact that updateProfile updates the backend. 
+          // Ideally AuthBloc should be re-fetched or updated.
+          // For now, let's just show success message.
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Đã cập nhật ảnh đại diện'), backgroundColor: AppColors.success),
+          );
+          
+          // Force reload user data
+          _loadUserData();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi upload ảnh: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   Widget _buildTextField({
@@ -367,10 +412,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           const SizedBox(height: 16),
           ListTile(
             onTap: () {
-              // TODO: Navigate to change password screen
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Tính năng đang phát triển')),
-              );
+              context.push('/profile/edit/password');
             },
             leading: const Icon(Icons.lock_outline, color: AppColors.error),
             title: Text(
