@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../theme/colors.dart';
 import '../../services/note_service.dart';
+import '../../services/flashcard_service.dart';
 import '../../models/note.dart';
 
 class NoteEditorScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class NoteEditorScreen extends StatefulWidget {
 
 class _NoteEditorScreenState extends State<NoteEditorScreen> {
   final NoteService _noteService = NoteService();
+  final FlashcardService _flashcardService = FlashcardService();
   final _contentController = TextEditingController();
   final _tagsController = TextEditingController();
   int? _pageNumber;
@@ -29,6 +31,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   bool _isLoading = false;
   bool _isLoadingNote = false;
   bool _hasChanges = false;
+  bool _createFlashcard = false;
+  bool _isAlreadyFlashcard = false;
   String? _error;
 
   bool get isEditing => widget.noteId != null;
@@ -59,6 +63,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           _contentController.text = note.content;
           _pageNumber = note.pageNumber;
           _tags = note.tags.toList();
+          _isAlreadyFlashcard = note.isFlashcard;
+          // If it's already a flashcard, we don't need to create one
+          _createFlashcard = false;
           _isLoadingNote = false;
         });
       }
@@ -115,19 +122,42 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     setState(() => _isLoading = true);
     
     try {
+      String? targetNoteId;
+
       if (isEditing) {
+        targetNoteId = widget.noteId;
         await _noteService.updateNote(widget.noteId!,
           content: _contentController.text.trim(),
           pageNumber: _pageNumber,
           tags: _tags,
         );
       } else {
-        await _noteService.createNote(
+        final newNote = await _noteService.createNote(
           bookId: widget.bookId!,
           content: _contentController.text.trim(),
           pageNumber: _pageNumber,
           tags: _tags,
         );
+        targetNoteId = newNote?.id;
+      }
+      
+      // Handle Flashcard Creation
+      if (_createFlashcard && !_isAlreadyFlashcard && targetNoteId != null) {
+         try {
+           await _flashcardService.createCardFromNote(targetNoteId);
+           if (mounted) {
+             ScaffoldMessenger.of(context).showSnackBar(
+               const SnackBar(content: Text('Đã tạo flashcard từ ghi chú')),
+             );
+           }
+         } catch (e) {
+            print('Flashcard creation error: $e');
+            if (mounted) {
+               ScaffoldMessenger.of(context).showSnackBar(
+                 SnackBar(content: Text('Lỗi tạo flashcard: $e'), backgroundColor: AppColors.error),
+               );
+            }
+         }
       }
       
       if (mounted) {
@@ -519,11 +549,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             ),
           ),
           Switch(
-            value: false,
-            onChanged: (value) {
-              // TODO: Toggle flashcard creation
-            },
             activeColor: AppColors.success,
+            onChanged: _isAlreadyFlashcard 
+                ? null 
+                : (value) {
+                    setState(() {
+                      _createFlashcard = value;
+                      _hasChanges = true;
+                    });
+                  },
+            value: _isAlreadyFlashcard ? true : _createFlashcard,
           ),
         ],
       ),
