@@ -165,6 +165,11 @@ class _ReviewHubScreenState extends State<ReviewHubScreen> {
                   color: isDark ? Colors.white70 : AppColors.textSecondaryLight),
                 onPressed: () => context.push('/settings/notifications'),
               ),
+              IconButton(
+                icon: Icon(Icons.add, 
+                  color: isDark ? Colors.white70 : AppColors.textSecondaryLight),
+                onPressed: () => context.push('/flashcard/create').then((_) => _loadData()),
+              ),
             ],
           ),
           
