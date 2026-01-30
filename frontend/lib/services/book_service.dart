@@ -59,7 +59,25 @@ class BookService {
   
   /// Get book by ISBN (from Google Books API first, then internal)
   Future<Map<String, dynamic>?> getBookByIsbn(String isbn) async {
-    // Try Google Books API first (public, no key needed)
+    // Try internal API first (which uses Google Books with API Key if configured)
+    try {
+      final response = await _api.get('/books/isbn/$isbn');
+      if (response.data != null) {
+        return {
+          ...response.data,
+          'found': true,
+        };
+      }
+    } catch (e) {
+      // If backend returns 404, it means it's not found in DB nor Google Books (via backend)
+      if (e is DioException && e.response?.statusCode == 404) {
+        return null;
+      }
+      // If other error (e.g. connection), fall back to public Google Books API below
+      print('Backend lookup failed: $e, falling back to direct Google Books API');
+    }
+    
+    // Fallback to direct Google Books API (public, limited quota)
     try {
       final googleDio = Dio(); // Separate Dio instance for external API
       final googleResponse = await googleDio.get(
@@ -87,20 +105,7 @@ class BookService {
         }
       }
     } catch (e) {
-      // Google Books failed, try internal API
-    }
-    
-    // Fallback to internal API
-    try {
-      final response = await _api.get('/books/isbn/$isbn');
-      if (response.data != null) {
-        return {
-          ...response.data,
-          'found': true,
-        };
-      }
-    } catch (e) {
-      // Not found
+      print('Google Books direct lookup failed: $e');
     }
     
     return null;
