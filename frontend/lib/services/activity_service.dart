@@ -2,6 +2,7 @@
 library;
 
 import 'api_service.dart';
+import '../exceptions/app_exception.dart';
 
 class ActivityService {
   final ApiService _api = ApiService();
@@ -14,6 +15,8 @@ class ActivityService {
         'size': size,
       });
       return response.data ?? {};
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể tải feed: $e');
     }
@@ -24,6 +27,8 @@ class ActivityService {
     try {
       await _api.post('/activities/$activityId/like');
       return true;
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể thích bài viết: $e');
     }
@@ -34,6 +39,8 @@ class ActivityService {
     try {
       await _api.delete('/activities/$activityId/like');
       return true;
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể bỏ thích bài viết: $e');
     }
@@ -46,6 +53,8 @@ class ActivityService {
         'content': content,
       });
       return response.data;
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể thêm bình luận: $e');
     }
@@ -56,6 +65,8 @@ class ActivityService {
     try {
       final response = await _api.get('/activities/$activityId/comments');
       return response.data ?? [];
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể tải bình luận: $e');
     }

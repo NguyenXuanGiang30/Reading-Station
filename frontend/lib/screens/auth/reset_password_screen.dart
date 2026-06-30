@@ -3,15 +3,19 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../theme/colors.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_spacing.dart';
+import '../../widgets/common/auth_scaffold.dart';
+import '../../widgets/common/custom_text_field.dart';
+import '../../widgets/common/primary_button.dart';
+import '../../l10n/app_localizations.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String email;
   final String otp;
-  
+
   const ResetPasswordScreen({
     super.key,
     required this.email,
@@ -26,7 +30,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
@@ -42,228 +46,119 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
-
     try {
       final api = ApiService();
-      await api.post('/auth/reset-password', data: {
-        'email': widget.email,
-        'otp': widget.otp,
-        'newPassword': _passwordController.text,
-        'confirmPassword': _confirmPasswordController.text,
-      });
+      await api.post(
+        '/auth/reset-password',
+        data: {
+          'email': widget.email,
+          'otp': widget.otp,
+          'newPassword': _passwordController.text,
+          'confirmPassword': _confirmPasswordController.text,
+        },
+      );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Đặt lại mật khẩu thành công!', style: GoogleFonts.inter()),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        // Navigate to login
-        context.go('/login');
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(S.of(context).t('auth_reset_title')),
+          backgroundColor: AppColors.success,
+        ),
+      );
+      context.go('/login');
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Lỗi: ${e.toString().replaceAll('Exception: ', '')}',
-              style: GoogleFonts.inter(),
-            ),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${S.of(context).t("error")}: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: AppColors.error,
+        ),
+      );
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
-          onPressed: () => context.pop(),
-        ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Icon
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: AppColors.success.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.lock_open,
-                    size: 40,
-                    color: AppColors.success,
-                  ),
+    return AuthScaffold(
+      title: S.of(context).t('auth_reset_title'),
+      subtitle: S.of(context).t('auth_reset_subtitle'),
+      icon: Icons.lock_open_rounded,
+      onBack: () => context.pop(),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          children: [
+            CustomTextField(
+              controller: _passwordController,
+              label: S.of(context).t('auth_new_password'),
+              hint: S.of(context).t('auth_password_hint'),
+              obscureText: _obscurePassword,
+              prefix: const Icon(Icons.lock_outline_rounded),
+              suffix: IconButton(
+                icon: Icon(
+                  _obscurePassword
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
                 ),
-
-                const SizedBox(height: 32),
-
-                Text(
-                  'Đặt mật khẩu mới',
-                  style: GoogleFonts.playfairDisplay(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                Text(
-                  'Tạo mật khẩu mới cho tài khoản của bạn.',
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                    height: 1.5,
-                  ),
-                ),
-
-                const SizedBox(height: 40),
-
-                // Password field
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  decoration: InputDecoration(
-                    labelText: 'Mật khẩu mới',
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: AppColors.primaryStart,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Vui lòng nhập mật khẩu mới';
-                    }
-                    if (value.length < 6) {
-                      return 'Mật khẩu phải có ít nhất 6 ký tự';
-                    }
-                    if (!RegExp(r'^[A-Z]').hasMatch(value)) {
-                      return 'Chữ cái đầu tiên phải viết hoa';
-                    }
-                    if (!RegExp(r'[0-9]').hasMatch(value)) {
-                      return 'Mật khẩu phải chứa ít nhất một số';
-                    }
-                    if (!RegExp(r'[!@#\$%^&*()_+\-=\[\]{};'':",./<>?~`]').hasMatch(value)) {
-                      return 'Mật khẩu phải chứa ký tự đặc biệt';
-                    }
-                    return null;
-                  },
-                ),
-
-                const SizedBox(height: 20),
-
-                // Confirm password field
-                TextFormField(
-                  controller: _confirmPasswordController,
-                  obscureText: _obscureConfirm,
-                  decoration: InputDecoration(
-                    labelText: 'Xác nhận mật khẩu',
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: AppColors.primaryStart,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Vui lòng xác nhận mật khẩu';
-                    }
-                    if (value != _passwordController.text) {
-                      return 'Mật khẩu xác nhận không khớp';
-                    }
-                    return null;
-                  },
-                ),
-
-                const SizedBox(height: 32),
-
-                // Submit button
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _resetPassword,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryStart,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : Text(
-                            'Đặt lại mật khẩu',
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                  ),
-                ),
-              ],
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return S.of(context).t('reset_pw_required');
+                }
+                if (value.length < 6) {
+                  return S.of(context).t('reset_pw_min_length');
+                }
+                if (!RegExp(r'[0-9]').hasMatch(value)) {
+                  return S.of(context).t('reset_pw_need_number');
+                }
+                if (!RegExp(r'[A-Z]').hasMatch(value)) {
+                  return S.of(context).t('reset_pw_need_upper');
+                }
+                if (!RegExp(
+                  r'[!@#\$%^&*()_+\-=\[\]{};:"\\|,.<>/?`~]',
+                ).hasMatch(value)) {
+                  return S.of(context).t('reset_pw_need_special');
+                }
+                return null;
+              },
             ),
-          ),
+            const SizedBox(height: AppSpacing.lg),
+            CustomTextField(
+              controller: _confirmPasswordController,
+              label: S.of(context).t('auth_confirm_password'),
+              hint: S.of(context).t('auth_confirm_hint'),
+              obscureText: _obscureConfirm,
+              prefix: const Icon(Icons.verified_user_outlined),
+              suffix: IconButton(
+                icon: Icon(
+                  _obscureConfirm
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                ),
+                onPressed: () =>
+                    setState(() => _obscureConfirm = !_obscureConfirm),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return S.of(context).t('reset_confirm_required');
+                }
+                if (value != _passwordController.text) {
+                  return S.of(context).t('reset_confirm_mismatch');
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: AppSpacing.xxl),
+            PrimaryButton(
+              label: S.of(context).t('auth_reset_btn'),
+              onPressed: _resetPassword,
+              loading: _isLoading,
+            ),
+          ],
         ),
       ),
     );

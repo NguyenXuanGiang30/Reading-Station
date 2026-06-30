@@ -1,274 +1,235 @@
-/// AboutScreen - Thông tin về ứng dụng
+/// AboutScreen - Thong tin ve ung dung
 library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../theme/colors.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_gradients.dart';
+import '../../theme/app_radius.dart';
+import '../../theme/app_spacing.dart';
+import '../../widgets/common/custom_app_bar.dart';
+import '../../widgets/common/modern_card.dart';
+import '../../widgets/common/section_header.dart';
+import '../../widgets/settings/settings_section_card.dart';
+import '../../l10n/app_localizations.dart';
 
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currentYear = DateTime.now().year;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Về Trạm Đọc',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-        ),
+      appBar: CustomAppBar(
+        title: S.of(context).t('about_title'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          // Logo & Name
-          Center(
-            child: Column(
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          children: [
+            _buildHeroCard(context),
+            const SizedBox(height: AppSpacing.xl),
+            ModernCard(
+              padding: const EdgeInsets.all(20),
+              child: SectionHeader(
+                title: S.of(context).t('about_spirit'),
+                subtitle:
+                    S.of(context).t('about_desc'),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            SettingsSectionCard(
+              title: S.of(context).t('about_features'),
+              subtitle:
+                  S.of(context).t('about_features_desc'),
               children: [
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppColors.primaryStart, AppColors.primaryEnd],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primaryStart.withValues(alpha: 0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.menu_book_rounded,
-                    size: 50,
-                    color: Colors.white,
-                  ),
+                _FeatureRow(
+                  icon: Icons.library_books_outlined,
+                  text: S.of(context).t('about_f1'),
                 ),
-                const SizedBox(height: 20),
-                Text(
-                  'Trạm Đọc',
-                  style: GoogleFonts.inter(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                  ),
+                _FeatureRow(
+                  icon: Icons.edit_note_outlined,
+                  text: S.of(context).t('about_f2'),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Phiên bản 1.0.0',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                  ),
+                _FeatureRow(
+                  icon: Icons.style_rounded,
+                  text: S.of(context).t('about_f3'),
+                ),
+                _FeatureRow(
+                  icon: Icons.timer_outlined,
+                  text: S.of(context).t('about_f4'),
+                ),
+                _FeatureRow(
+                  icon: Icons.camera_alt_outlined,
+                  text: S.of(context).t('about_f5'),
+                ),
+                _FeatureRow(
+                  icon: Icons.groups_2_outlined,
+                  text: S.of(context).t('about_f6'),
                 ),
               ],
             ),
-          ),
-
-          const SizedBox(height: 32),
-
-          // Tagline
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.primaryStart.withValues(alpha: 0.1),
-                  AppColors.primaryEnd.withValues(alpha: 0.1),
+            const SizedBox(height: AppSpacing.xl),
+            SettingsSectionCard(
+              title: S.of(context).t('about_tech'),
+              subtitle:
+                  S.of(context).t('about_tech_desc'),
+              children: [
+                _TechWrap(
+                  labels: [
+                    'Flutter',
+                    'Material 3',
+                    'Spring Boot',
+                    'PostgreSQL',
+                    'Google ML Kit',
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            ModernCard(
+              padding: const EdgeInsets.all(20),
+              gradient: AppGradients.softGlassOverlay,
+              child: Column(
+                children: [
+                  Text(
+                    S.of(context).t('about_team'),
+                    style: Theme.of(context).textTheme.titleLarge,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    S.of(context).t('about_made_in'),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    S.of(context).t('about_version_label'),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelLarge?.copyWith(color: AppColors.primary),
+                  ),
                 ],
               ),
-              borderRadius: BorderRadius.circular(16),
             ),
-            child: Text(
-              '📚 Đọc sách, ghi chú, ôn tập thông minh.\n\nTrạm Đọc giúp bạn xây dựng thói quen đọc sách, lưu giữ những điều quan trọng và ghi nhớ lâu hơn với hệ thống Flashcard thông minh.',
+            const SizedBox(height: AppSpacing.xl),
+            Text(
+              '© $currentYear ${S.of(context).t("about_brand")}. ${S.of(context).t("about_rights")}',
+              style: Theme.of(context).textTheme.bodySmall,
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                height: 1.6,
-                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-              ),
             ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Features
-          _buildSection(
-            title: 'Tính năng chính',
-            children: [
-              _buildFeatureItem(Icons.library_books, 'Quản lý thư viện sách cá nhân', isDark),
-              _buildFeatureItem(Icons.edit_note, 'Ghi chú và highlight thông minh', isDark),
-              _buildFeatureItem(Icons.style, 'Flashcard với Spaced Repetition', isDark),
-              _buildFeatureItem(Icons.timer, 'Chế độ Focus Mode', isDark),
-              _buildFeatureItem(Icons.camera_alt, 'OCR - Chụp và lưu trích dẫn', isDark),
-              _buildFeatureItem(Icons.people, 'Kết nối với bạn đọc', isDark),
-            ],
-            isDark: isDark,
-          ),
-
-          const SizedBox(height: 24),
-
-          // Developer info
-          _buildSection(
-            title: 'Phát triển bởi',
-            children: [
-              ListTile(
-                leading: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryStart.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.code, color: AppColors.primaryStart),
-                ),
-                title: Text(
-                  'Reading Station Team',
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                  ),
-                ),
-                subtitle: Text(
-                  'Made with ❤️ in Vietnam',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                  ),
-                ),
-              ),
-            ],
-            isDark: isDark,
-          ),
-
-          const SizedBox(height: 24),
-
-          // Tech stack
-          _buildSection(
-            title: 'Công nghệ',
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _buildTechChip('Flutter', isDark),
-                    _buildTechChip('Spring Boot', isDark),
-                    _buildTechChip('PostgreSQL', isDark),
-                    _buildTechChip('Google ML Kit', isDark),
-                  ],
-                ),
-              ),
-            ],
-            isDark: isDark,
-          ),
-
-          const SizedBox(height: 32),
-
-          // Copyright
-          Center(
-            child: Text(
-              '© 2024 Trạm Đọc. All rights reserved.',
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 40),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSection({
-    required String title,
-    required List<Widget> children,
-    required bool isDark,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 12),
-          child: Text(
-            title,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-            ),
-          ),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.cardDark : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: isDark
-                ? []
-                : [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-          ),
-          child: Column(children: children),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFeatureItem(IconData icon, String text, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
+  Widget _buildHeroCard(BuildContext context) {
+    return ModernCard(
+      gradient: AppGradients.sunriseAccent,
+      padding: const EdgeInsets.all(24),
+      child: Column(
         children: [
-          Icon(icon, size: 20, color: AppColors.primaryStart),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-              ),
+          Container(
+            width: 104,
+            height: 104,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(AppRadius.xl),
             ),
+            child: const Icon(
+              Icons.menu_book_rounded,
+              size: 52,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Text(
+            S.of(context).t('about_app_name'),
+            style: Theme.of(
+              context,
+            ).textTheme.displayMedium?.copyWith(color: Colors.white),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            S.of(context).t('about_tagline'),
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: Colors.white.withValues(alpha: 0.88),
+            ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildTechChip(String label, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.primaryStart.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.inter(
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-          color: AppColors.primaryStart,
+class _FeatureRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  _FeatureRow({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: AppColors.primarySoft,
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
+        child: Icon(icon, color: AppColors.primary),
+      ),
+      title: Text(text, style: Theme.of(context).textTheme.titleMedium),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.sm,
+      ),
+    );
+  }
+}
+
+class _TechWrap extends StatelessWidget {
+  final List<String> labels;
+
+  _TechWrap({required this.labels});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Wrap(
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.sm,
+        children: labels
+            .map(
+              (label) => Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primarySoft,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  label,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(color: AppColors.primary),
+                ),
+              ),
+            )
+            .toList(),
       ),
     );
   }

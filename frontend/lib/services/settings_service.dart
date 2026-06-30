@@ -3,6 +3,7 @@ library;
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
+import '../exceptions/app_exception.dart';
 
 class SettingsService {
   final ApiService _api = ApiService();
@@ -38,6 +39,8 @@ class SettingsService {
         final data = response.data as Map<String, dynamic>;
         await _cacheSettings(data);
       }
+    } on AppException {
+      rethrow;
     } catch (e) {
       // Fallback to local cache if offline
     }
@@ -47,6 +50,8 @@ class SettingsService {
   Future<void> _updateServer(Map<String, dynamic> updates) async {
     try {
       await _api.put('/settings', data: updates);
+    } on AppException {
+      rethrow;
     } catch (e) {
       // Silently fail - settings are cached locally
     }

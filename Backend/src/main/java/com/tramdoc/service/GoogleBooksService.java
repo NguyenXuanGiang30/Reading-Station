@@ -3,10 +3,11 @@ package com.tramdoc.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tramdoc.entity.Book;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -17,6 +18,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
 public class GoogleBooksService {
+
+    private static final Logger log = LoggerFactory.getLogger(GoogleBooksService.class);
 
     @Value("${google.books.api.url}")
     private String apiUrl;
@@ -49,13 +52,15 @@ public class GoogleBooksService {
 
             return parseSearchResponse(response);
         } catch (Exception e) {
-            System.err.println("Error searching books: " + e.getMessage());
             if (e instanceof org.springframework.web.reactive.function.client.WebClientResponseException) {
-                System.err.println("Response body: " +
-                        ((org.springframework.web.reactive.function.client.WebClientResponseException) e)
-                                .getResponseBodyAsString());
+                org.springframework.web.reactive.function.client.WebClientResponseException webClientException =
+                        (org.springframework.web.reactive.function.client.WebClientResponseException) e;
+                log.warn("Google Books search failed with status {} and body {}",
+                        webClientException.getStatusCode(),
+                        webClientException.getResponseBodyAsString());
+            } else {
+                log.warn("Google Books search failed for query {}", query, e);
             }
-            e.printStackTrace();
             return new ArrayList<>();
         }
     }
@@ -77,13 +82,16 @@ public class GoogleBooksService {
             List<Book> books = parseSearchResponse(response);
             return books.isEmpty() ? null : books.get(0);
         } catch (Exception e) {
-            System.err.println("Error fetching book by ISBN: " + e.getMessage());
             if (e instanceof org.springframework.web.reactive.function.client.WebClientResponseException) {
-                System.err.println("Response body: " +
-                        ((org.springframework.web.reactive.function.client.WebClientResponseException) e)
-                                .getResponseBodyAsString());
+                org.springframework.web.reactive.function.client.WebClientResponseException webClientException =
+                        (org.springframework.web.reactive.function.client.WebClientResponseException) e;
+                log.warn("Google Books ISBN lookup failed for {} with status {} and body {}",
+                        isbn,
+                        webClientException.getStatusCode(),
+                        webClientException.getResponseBodyAsString());
+            } else {
+                log.warn("Google Books ISBN lookup failed for {}", isbn, e);
             }
-            e.printStackTrace();
             return null;
         }
     }
@@ -103,7 +111,7 @@ public class GoogleBooksService {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            log.warn("Failed to parse Google Books search response", e);
         }
         return books;
     }
@@ -171,7 +179,7 @@ public class GoogleBooksService {
                     .language("vi")
                     .build();
         } catch (Exception e) {
-            e.printStackTrace();
+            log.warn("Failed to parse Google Books item", e);
             return null;
         }
     }

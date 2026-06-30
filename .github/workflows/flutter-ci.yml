@@ -1,0 +1,113 @@
+name: Flutter CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  FLUTTER_VERSION: '3.24.0'
+  DOCKER_REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/tramdoc-app
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ env.FLUTTER_VERSION }}
+        
+    - name: Get dependencies
+      run: |
+        cd frontend
+        flutter pub get
+        
+    - name: Analyze code
+      run: |
+        cd frontend
+        flutter analyze --no-pub
+
+  build-apk:
+    needs: analyze
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ env.FLUTTER_VERSION }}
+        
+    - name: Get dependencies
+      run: |
+        cd frontend
+        flutter pub get
+        
+    - name: Build debug APK
+      run: |
+        cd frontend
+        flutter build apk --debug
+        
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-debug.apk
+        path: frontend/build/app/outputs/flutter-apk/app-debug.apk
+        retention-days: 7
+
+  build-release-apk:
+    needs: analyze
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ env.FLUTTER_VERSION }}
+        
+    - name: Get dependencies
+      run: |
+        cd frontend
+        flutter pub get
+        
+    - name: Build release APK
+      env:
+        KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      run: |
+        cd frontend
+        
+        # Decode keystore
+        echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
+        
+        # Create key.properties
+        cat > key.properties << EOF
+        storeFile=release.keystore
+        storePassword=$KEYSTORE_PASSWORD
+        keyAlias=$KEY_ALIAS
+        keyPassword=$KEY_PASSWORD
+        EOF
+        
+        # Build release
+        flutter build apk --release
+        
+    - name: Upload release APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-release.apk
+        path: frontend/build/app/outputs/flutter-apk/app-release.apk

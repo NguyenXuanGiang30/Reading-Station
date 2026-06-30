@@ -2,6 +2,7 @@
 library;
 
 import 'api_service.dart';
+import '../exceptions/app_exception.dart';
 
 class KeyTakeawayService {
   final ApiService _api = ApiService();
@@ -11,6 +12,8 @@ class KeyTakeawayService {
     try {
       final response = await _api.get('/user-books/$userBookId/takeaways');
       return response.data ?? [];
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể tải key takeaways: $e');
     }
@@ -28,6 +31,8 @@ class KeyTakeawayService {
         'pageNumber': pageNumber,
       });
       return response.data;
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể tạo takeaway: $e');
     }
@@ -43,6 +48,8 @@ class KeyTakeawayService {
         'content': content,
       });
       return response.data;
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể cập nhật takeaway: $e');
     }
@@ -53,6 +60,8 @@ class KeyTakeawayService {
     try {
       await _api.delete('/takeaways/$takeawayId');
       return true;
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể xóa takeaway: $e');
     }
@@ -65,6 +74,8 @@ class KeyTakeawayService {
         'takeawayIds': takeawayIds,
       });
       return response.data ?? [];
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể sắp xếp lại takeaways: $e');
     }
@@ -75,6 +86,8 @@ class KeyTakeawayService {
     try {
       final response = await _api.post('/takeaways/$takeawayId/flashcard');
       return response.data;
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể tạo flashcard: $e');
     }

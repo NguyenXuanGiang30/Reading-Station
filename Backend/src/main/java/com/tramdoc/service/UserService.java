@@ -77,4 +77,15 @@ public class UserService {
                 .createdAt(user.getCreatedAt())
                 .build();
     }
+
+    @Transactional
+    public void deleteCurrentUser() {
+        UserPrincipal userPrincipal = (UserPrincipal) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+
+        User user = userRepository.findById(userPrincipal.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        userRepository.delete(user);
+    }
 }

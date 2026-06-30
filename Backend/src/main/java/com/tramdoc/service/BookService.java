@@ -22,6 +22,9 @@ public class BookService {
     @Autowired
     private GoogleBooksService googleBooksService;
     
+    @Autowired
+    private OpenLibraryService openLibraryService;
+    
     public Page<Book> getAllBooks(Pageable pageable) {
         return bookRepository.findAll(pageable);
     }
@@ -63,6 +66,12 @@ public class BookService {
         
         // Fetch from Google Books API
         Book book = googleBooksService.getBookByIsbn(isbn);
+        if (book != null) {
+            return bookRepository.save(book);
+        }
+
+        // Fetch from OpenLibrary API as fallback
+        book = openLibraryService.getBookByIsbn(isbn);
         if (book != null) {
             return bookRepository.save(book);
         }

@@ -4,12 +4,15 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../theme/colors.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/auth/auth_event.dart';
 import '../../blocs/auth/auth_state.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_durations.dart';
+import '../../theme/app_gradients.dart';
+import '../../theme/app_spacing.dart';
+import '../../l10n/app_localizations.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -20,37 +23,28 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _opacityAnimation;
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
 
   @override
   void initState() {
     super.initState();
-    
-    _animationController = AnimationController(
+    _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1400),
+    )..forward();
+
+    _scale = Tween(begin: 0.88, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: AppDurations.playful),
     );
-    
-    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.elasticOut,
-      ),
+    _fade = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+    _slide = Tween(begin: const Offset(0, 0.1), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: AppDurations.emphasized),
     );
-    
-    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.0, 0.5, curve: Curves.easeIn),
-      ),
-    );
-    
-    _animationController.forward();
-    
-    // Check auth status after animation
-    Future.delayed(const Duration(milliseconds: 2000), () {
+
+    Future.delayed(const Duration(milliseconds: 1800), () {
       if (mounted) {
         context.read<AuthBloc>().add(const AuthCheckRequested());
       }
@@ -59,7 +53,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -77,94 +71,119 @@ class _SplashScreenState extends State<SplashScreen>
       },
       child: Scaffold(
         body: Container(
-          width: double.infinity,
-          height: double.infinity,
-          decoration: const BoxDecoration(
-            gradient: AppColors.primaryGradient,
-          ),
-          child: SafeArea(
-            child: Center(
-              child: AnimatedBuilder(
-                animation: _animationController,
-                builder: (context, child) {
-                  return Opacity(
-                    opacity: _opacityAnimation.value,
-                    child: Transform.scale(
-                      scale: _scaleAnimation.value,
-                      child: child,
-                    ),
-                  );
-                },
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Logo Container
-                    Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            blurRadius: 30,
-                            offset: const Offset(0, 15),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.menu_book_rounded,
-                        size: 60,
-                        color: AppColors.primaryStart,
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 32),
-                    
-                    // App Name
-                    Text(
-                      'Trạm Đọc',
-                      style: GoogleFonts.playfairDisplay(
-                        fontSize: 42,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 12),
-                    
-                    // Tagline
-                    Text(
-                      'Đọc sách, ghi chú, ôn tập thông minh',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        color: Colors.white.withValues(alpha: 0.9),
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 60),
-                    
-                    // Loading indicator
-                    SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Colors.white.withValues(alpha: 0.8),
-                        ),
-                        strokeWidth: 3,
-                      ),
-                    ),
-                  ],
+          decoration: const BoxDecoration(gradient: AppGradients.warmHero),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned(
+                top: -80,
+                right: -40,
+                child: _BlurOrb(
+                  color: Colors.white.withValues(alpha: 0.42),
+                  size: 220,
                 ),
               ),
-            ),
+              Positioned(
+                bottom: -60,
+                left: -40,
+                child: _BlurOrb(
+                  color: AppColors.accent.withValues(alpha: 0.22),
+                  size: 260,
+                ),
+              ),
+              SafeArea(
+                child: Center(
+                  child: FadeTransition(
+                    opacity: _fade,
+                    child: SlideTransition(
+                      position: _slide,
+                      child: ScaleTransition(
+                        scale: _scale,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 124,
+                              height: 124,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.88),
+                                borderRadius: BorderRadius.circular(36),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.16,
+                                    ),
+                                    blurRadius: 30,
+                                    offset: const Offset(0, 14),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.auto_stories_rounded,
+                                size: 62,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xxxl),
+                            Text(
+                              S.of(context).t('splash_app_name'),
+                              style: Theme.of(context).textTheme.displayLarge
+                                  ?.copyWith(color: AppColors.textPrimary),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              S.of(context).t('splash_tagline'),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: AppColors.textSecondary),
+                            ),
+                            const SizedBox(height: AppSpacing.xxxl),
+                            Column(
+                              children: [
+                                SizedBox(
+                                  width: 44,
+                                  height: 44,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 3,
+                                    color: AppColors.primary,
+                                    backgroundColor: Colors.white.withValues(
+                                      alpha: 0.4,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.md),
+                                Text(
+                                  S.of(context).t('splash_loading'),
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _BlurOrb extends StatelessWidget {
+  final Color color;
+  final double size;
+
+  const _BlurOrb({required this.color, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
 }

@@ -1,17 +1,21 @@
-/// OCRCameraScreen - Chụp ảnh để OCR
+/// OCRCameraScreen - Chup anh de OCR
 library;
 
-import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 
-import '../../theme/colors.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_gradients.dart';
+import '../../theme/app_radius.dart';
+import '../../theme/app_spacing.dart';
+import '../../widgets/common/modern_card.dart';
+import '../../l10n/app_localizations.dart';
 
 class OCRCameraScreen extends StatefulWidget {
   final String? bookId;
-  
+
   const OCRCameraScreen({super.key, this.bookId});
 
   @override
@@ -33,6 +37,12 @@ class _OCRCameraScreenState extends State<OCRCameraScreen> {
     _initCamera();
   }
 
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
   Future<void> _initCamera() async {
     try {
       _cameras = await availableCameras();
@@ -44,27 +54,16 @@ class _OCRCameraScreenState extends State<OCRCameraScreen> {
         );
         await _controller!.initialize();
         if (mounted) {
-          setState(() {
-            _isInitialized = true;
-          });
+          setState(() => _isInitialized = true);
         }
-      } else {
-        if (mounted) {
-           setState(() => _errorMsg = 'Không tìm thấy camera');
-        }
+      } else if (mounted) {
+        setState(() => _errorMsg = S.of(context).t('ocr_no_camera'));
       }
     } catch (e) {
-      debugPrint('Camera init error: $e');
       if (mounted) {
-         setState(() => _errorMsg = 'Lỗi khởi động camera: $e');
+        setState(() => _errorMsg = '${S.of(context).t("ocr_cam_err")}: $e');
       }
     }
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
   }
 
   Future<void> _captureImage() async {
@@ -72,54 +71,47 @@ class _OCRCameraScreenState extends State<OCRCameraScreen> {
       return;
     }
 
-    setState(() {
-      _isCapturing = true;
-    });
+    setState(() => _isCapturing = true);
 
     try {
       final image = await _controller!.takePicture();
       if (mounted) {
-        context.push('/ocr/edit?image=${Uri.encodeComponent(image.path)}&bookId=${widget.bookId ?? ''}');
+        context.push(
+          '/ocr/edit?image=${Uri.encodeComponent(image.path)}&bookId=${widget.bookId ?? ''}',
+        );
       }
-    } catch (e) {
-      debugPrint('Capture error: $e');
+    } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Không thể chụp ảnh')),
+          SnackBar(content: Text(S.of(context).t('ocr_capture_err'))),
         );
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isCapturing = false;
-        });
+        setState(() => _isCapturing = false);
       }
     }
   }
 
   Future<void> _pickImage() async {
     try {
-      final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
       if (pickedFile != null && mounted) {
-        context.push('/ocr/edit?image=${Uri.encodeComponent(pickedFile.path)}&bookId=${widget.bookId ?? ''}');
+        context.push(
+          '/ocr/edit?image=${Uri.encodeComponent(pickedFile.path)}&bookId=${widget.bookId ?? ''}',
+        );
       }
-    } catch (e) {
-      debugPrint('Pick image error: $e');
-    }
+    } catch (_) {}
   }
 
   Future<void> _toggleFlash() async {
     if (_controller == null) return;
-    
+
     try {
       _flashOn = !_flashOn;
-      await _controller!.setFlashMode(
-        _flashOn ? FlashMode.torch : FlashMode.off,
-      );
+      await _controller!.setFlashMode(_flashOn ? FlashMode.torch : FlashMode.off);
       setState(() {});
-    } catch (e) {
-      debugPrint('Flash toggle error: $e');
-    }
+    } catch (_) {}
   }
 
   @override
@@ -128,215 +120,247 @@ class _OCRCameraScreenState extends State<OCRCameraScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Camera Preview
-          if (_isInitialized && _controller != null)
-            Positioned.fill(
-              child: CameraPreview(_controller!),
-            )
-          else
-            Center(
-              child: _errorMsg != null 
-                  ? Text(_errorMsg!, style: const TextStyle(color: Colors.white))
-                  : const CircularProgressIndicator(color: Colors.white),
-            ),
-          
-          // Overlay with focus area
-          _buildOverlay(),
-          
-          // Top bar
+          Positioned.fill(child: _buildPreview()),
+          Positioned.fill(child: _buildOverlay()),
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            child: _buildTopBar(),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    _TopButton(
+                      icon: Icons.close_rounded,
+                      onTap: () => context.pop(),
+                    ),
+                    const Spacer(),
+                    ModernCard(
+                      gradient: AppGradients.softGlassOverlay,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      child: Text(
+                        S.of(context).t('ocr_camera_title'),
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    _TopButton(
+                      icon: _flashOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+                      onTap: _toggleFlash,
+                      active: _flashOn,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-          
-          // Bottom controls
-          _buildBottomControls(),
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 24,
+            child: SafeArea(
+              child: Column(
+                children: [
+                  ModernCard(
+                    gradient: AppGradients.softGlassOverlay,
+                    child: Column(
+                      children: [
+                        Text(
+                          S.of(context).t('ocr_place_text'),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.white,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _BottomAction(
+                              icon: Icons.photo_library_outlined,
+                              label: S.of(context).t('barcode_gallery'),
+                              onTap: _pickImage,
+                            ),
+                            GestureDetector(
+                              onTap: _isCapturing ? null : _captureImage,
+                              child: Container(
+                                width: 84,
+                                height: 84,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 4),
+                                ),
+                                child: Container(
+                                  margin: const EdgeInsets.all(5),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [Colors.white, Color(0xFFF4E7E1)],
+                                    ),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child:
+                                      _isCapturing
+                                          ? const Padding(
+                                            padding: EdgeInsets.all(24),
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                          : const Icon(
+                                            Icons.camera_alt_rounded,
+                                            color: AppColors.primary,
+                                            size: 34,
+                                          ),
+                                ),
+                              ),
+                            ),
+                            _BottomAction(
+                              icon: Icons.auto_awesome_outlined,
+                              label: 'OCR',
+                              onTap: _isInitialized ? _captureImage : null,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPreview() {
+    if (_isInitialized && _controller != null) {
+      return CameraPreview(_controller!);
+    }
+
+    return Center(
+      child:
+          _errorMsg != null
+              ? Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  _errorMsg!,
+                  style: const TextStyle(color: Colors.white),
+                  textAlign: TextAlign.center,
+                ),
+              )
+              : const CircularProgressIndicator(color: Colors.white),
     );
   }
 
   Widget _buildOverlay() {
-    return Positioned.fill(
-      child: Column(
-        children: [
-          // Top dark area
-          Expanded(
-            flex: 2,
-            child: Container(color: Colors.black.withOpacity(0.5)),
+    return Column(
+      children: [
+        Expanded(child: Container(color: Colors.black.withValues(alpha: 0.45))),
+        Container(
+          height: 220,
+          margin: const EdgeInsets.symmetric(horizontal: 24),
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.primary, width: 2),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
-          
-          // Focus area
-          Container(
-            height: 200,
-            margin: const EdgeInsets.symmetric(horizontal: 24),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.primaryStart, width: 2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Stack(
-              children: [
-                // Guide text
-                Center(
-                  child: Text(
-                    'Đặt văn bản trong khung',
-                    style: GoogleFonts.inter(
-                      color: Colors.white.withOpacity(0.7),
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ],
+          child: Center(
+            child: Text(
+               S.of(context).t('ocr_place_in_frame'),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.white.withValues(alpha: 0.8),
+              ),
             ),
           ),
-          
-          // Bottom dark area
-          Expanded(
-            flex: 3,
-            child: Container(color: Colors.black.withOpacity(0.5)),
+        ),
+        Expanded(
+          flex: 2,
+          child: Container(color: Colors.black.withValues(alpha: 0.45)),
+        ),
+      ],
+    );
+  }
+}
+
+class _TopButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool active;
+
+  const _TopButton({
+    required this.icon,
+    required this.onTap,
+    this.active = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color:
+          active
+              ? AppColors.warning.withValues(alpha: 0.2)
+              : Colors.black.withValues(alpha: 0.32),
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Icon(
+            icon,
+            color: active ? AppColors.warning : Colors.white,
           ),
-        ],
+        ),
       ),
     );
   }
+}
 
-  Widget _buildTopBar() {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+class _BottomAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  const _BottomAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: SizedBox(
+        width: 72,
+        child: Column(
           children: [
-            IconButton(
-              onPressed: () => context.pop(),
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.close, color: Colors.white),
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(16),
               ),
+              child: Icon(icon, color: Colors.white),
             ),
+            const SizedBox(height: AppSpacing.sm),
             Text(
-              'Chụp ảnh OCR',
-              style: GoogleFonts.inter(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Colors.white,
               ),
-            ),
-            IconButton(
-              onPressed: _toggleFlash,
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  _flashOn ? Icons.flash_on : Icons.flash_off,
-                  color: _flashOn ? AppColors.warning : Colors.white,
-                ),
-              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildBottomControls() {
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            children: [
-              // Tips
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '💡 Đảm bảo đủ ánh sáng và văn bản rõ ràng',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: Colors.white.withOpacity(0.8),
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Capture button
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  // Gallery button
-                  _buildControlButton(
-                    icon: Icons.photo_library,
-                    onTap: _pickImage,
-                  ),
-                  
-                  // Capture button
-                  GestureDetector(
-                    onTap: _isCapturing ? null : _captureImage,
-                    child: Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 4),
-                      ),
-                      child: Container(
-                        margin: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: _isCapturing ? Colors.grey : Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                        child: _isCapturing
-                            ? const Padding(
-                                padding: EdgeInsets.all(20),
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : null,
-                      ),
-                    ),
-                  ),
-                  
-                  // Placeholder for symmetry
-                  const SizedBox(width: 48),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildControlButton({
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: Colors.white),
       ),
     );
   }

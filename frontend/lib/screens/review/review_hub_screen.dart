@@ -1,13 +1,23 @@
-/// ReviewHubScreen - Trung tâm ôn tập flashcard with API Integration
+﻿/// ReviewHubScreen - Trung tâm ôn tập flashcard
 library;
+
+import '../../l10n/app_localizations.dart';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../theme/colors.dart';
-import '../../services/flashcard_service.dart';
 import '../../models/flashcard.dart';
+import '../../services/flashcard_service.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_gradients.dart';
+import '../../theme/app_radius.dart';
+import '../../theme/app_spacing.dart';
+import '../../widgets/common/modern_card.dart';
+import '../../widgets/common/primary_button.dart';
+import '../../widgets/common/section_header.dart';
+import '../../widgets/states/empty_state_widget.dart';
+import '../../widgets/states/error_state_widget.dart';
+import '../../widgets/states/loading_widget.dart';
 
 class ReviewHubScreen extends StatefulWidget {
   const ReviewHubScreen({super.key});
@@ -18,10 +28,10 @@ class ReviewHubScreen extends StatefulWidget {
 
 class _ReviewHubScreenState extends State<ReviewHubScreen> {
   final FlashcardService _service = FlashcardService();
-  
+
   bool _isLoading = true;
   String? _error;
-  
+
   List<FlashcardDeck> _decks = [];
   Map<String, dynamic> _statistics = {};
   int _dueCardsCount = 0;
@@ -32,477 +42,167 @@ class _ReviewHubScreenState extends State<ReviewHubScreen> {
     super.initState();
     _loadData();
   }
-  
+
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
-    
+
     try {
       final results = await Future.wait([
         _service.getDecks(),
         _service.getStatistics(),
         _service.getTodaySummary(),
       ]);
-      
-      if (mounted) {
-        final decks = results[0] as List<FlashcardDeck>;
-        final stats = results[1] as Map<String, dynamic>;
-        final today = results[2] as Map<String, dynamic>;
-        
-        setState(() {
-          _decks = decks;
-          _statistics = stats;
-          _dueCardsCount = today['due'] as int? ?? 0;
-          _streakDays = stats['streak'] as int? ?? 0;
-          _isLoading = false;
-        });
-      }
+
+      if (!mounted) return;
+      final decks = results[0] as List<FlashcardDeck>;
+      final stats = results[1] as Map<String, dynamic>;
+      final today = results[2] as Map<String, dynamic>;
+
+      setState(() {
+        _decks = decks;
+        _statistics = stats;
+        _dueCardsCount = today['due'] as int? ?? 0;
+        _streakDays = stats['streak'] as int? ?? 0;
+        _isLoading = false;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
     if (_isLoading) {
       return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const CircularProgressIndicator(color: AppColors.primaryStart),
-              const SizedBox(height: 16),
-              Text('Đang tải...', style: GoogleFonts.plusJakartaSans(color: Colors.grey)),
-            ],
+        body: SafeArea(
+          child: LoadingWidget(
+            fullScreen: true,
+            message: S.of(context).t('review_loading'),
           ),
         ),
       );
     }
-    
+
     if (_error != null) {
       return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64, color: AppColors.error),
-              const SizedBox(height: 16),
-              Text(_error!),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: _loadData,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Thử lại'),
-              ),
-            ],
+        body: SafeArea(
+          child: ErrorStateWidget(
+            message: _error!,
+            onRetry: _loadData,
           ),
         ),
       );
     }
-    
+
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: _loadData,
-        color: AppColors.primaryStart,
         child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            // Header
-            SliverToBoxAdapter(
-              child: _buildHeader(context, isDark),
-            ),
-            
-            // Stats overview
-            SliverToBoxAdapter(
-              child: _buildStatsOverview(isDark),
-            ),
-            
-            // Decks list
-            SliverToBoxAdapter(
-              child: _buildDecksSection(context, isDark),
-            ),
-            
-            // Bottom padding
-            const SliverToBoxAdapter(
-              child: SizedBox(height: 120),
+            SliverToBoxAdapter(child: _buildHeroSection(context)),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  _buildOverviewSection(context),
+                  const SizedBox(height: AppSpacing.xl),
+                  _buildDeckSection(context),
+                ]),
+              ),
             ),
           ],
         ),
       ),
-      floatingActionButton: _dueCardsCount > 0 ? _buildStudyButton(context) : null,
+      floatingActionButton:
+          _dueCardsCount > 0
+              ? FloatingActionButton.extended(
+                onPressed: () => context.push('/flashcard/session'),
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: Text(S.of(context).t('review_start_btn')),
+              )
+              : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool isDark) {
+  Widget _buildHeroSection(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 16, 20, 20),
-      color: isDark ? AppColors.surfaceDark : Colors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Ôn tập',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                ),
-              ),
-              IconButton(
-                icon: Icon(Icons.settings, 
-                  color: isDark ? Colors.white70 : AppColors.textSecondaryLight),
-                onPressed: () => context.push('/settings/notifications'),
-              ),
-              IconButton(
-                icon: Icon(Icons.add, 
-                  color: isDark ? Colors.white70 : AppColors.textSecondaryLight),
-                onPressed: () => context.push('/flashcard/create').then((_) => _loadData()),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Stats row - flat style
-          Row(
-            children: [
-              _buildHeaderStat('$_dueCardsCount', 'Thẻ cần ôn', Icons.style, AppColors.primaryStart, isDark),
-              const SizedBox(width: 24),
-              _buildHeaderStat('$_streakDays', 'Ngày streak', Icons.local_fire_department, Colors.orange, isDark),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeaderStat(String value, String label, IconData icon, Color color, bool isDark) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                  ),
-                ),
-                Text(
-                  label,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-
-  Widget _buildStatsOverview(bool isDark) {
-    final totalCards = _statistics['totalCards'] as int? ?? _decks.fold<int>(0, (sum, d) => sum + d.totalCards);
-    final masteredCards = _statistics['masteredCards'] as int? ?? 0;
-    final masteryPercent = totalCards > 0 ? (masteredCards / totalCards * 100).toInt() : 0;
-    
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.cardDark : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: isDark ? [] : [
-            BoxShadow(
-              color: AppColors.shadowLight,
-              blurRadius: 15,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Tổng quan',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildOverviewStat(
-                    value: '$totalCards',
-                    label: 'Tổng thẻ',
-                    color: AppColors.info,
-                    isDark: isDark,
-                  ),
-                ),
-                Expanded(
-                  child: _buildOverviewStat(
-                    value: '$masteredCards',
-                    label: 'Đã thuộc',
-                    color: AppColors.success,
-                    isDark: isDark,
-                  ),
-                ),
-                Expanded(
-                  child: _buildOverviewStat(
-                    value: '$masteryPercent%',
-                    label: 'Mastery',
-                    color: AppColors.warning,
-                    isDark: isDark,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOverviewStat({
-    required String value,
-    required String label,
-    required Color color,
-    required bool isDark,
-  }) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 13,
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDecksSection(BuildContext context, bool isDark) {
-    if (_decks.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(20),
-        child: Center(
-          child: Column(
-            children: [
-              Icon(Icons.style_outlined, size: 64, color: Colors.grey.shade400),
-              const SizedBox(height: 16),
-              Text(
-                'Chưa có bộ thẻ nào',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 16,
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Tạo flashcard từ ghi chú sách',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
-                  color: Colors.grey,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Bộ thẻ',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ..._decks.asMap().entries.map((entry) {
-            return _buildDeckCard(
-              context,
-              entry.value,
-              entry.key,
-              isDark,
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDeckCard(
-    BuildContext context,
-    FlashcardDeck deck,
-    int index,
-    bool isDark,
-  ) {
-    final total = deck.totalCards;
-    final due = deck.dueCards;
-    final mastered = deck.masteredCards;
-    final masteryPercent = total > 0 ? mastered / total : 0.0;
-    
-    return GestureDetector(
-      onTap: due > 0 
-          ? () => context.push('/flashcard/session?deckId=${deck.userBookId}')
-          : null,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        decoration: BoxDecoration(
-          gradient: AppColors.deckGradients[index % AppColors.deckGradients.length],
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.deckGradients[index % AppColors.deckGradients.length]
-                  .colors.first.withValues(alpha: 0.4),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(20),
+      decoration: const BoxDecoration(gradient: AppGradients.warmHero),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
                     child: Text(
-                      deck.bookTitle,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      S.of(context).t('review_title'),
+                      style: Theme.of(context).textTheme.headlineMedium,
                     ),
                   ),
-                  if (due > 0)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        '$due thẻ cần ôn',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.check_circle, color: Colors.white, size: 14),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Đã ôn',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  IconButton(
+                    onPressed: () => context.push('/settings/flashcard'),
+                    icon: const Icon(Icons.tune_rounded),
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      context.push('/flashcard/create').then((_) => _loadData());
+                    },
+                    icon: const Icon(Icons.add_circle_outline_rounded),
+                  ),
                 ],
               ),
-              
-              const SizedBox(height: 16),
-              
-              // Progress bar
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: masteryPercent,
-                  backgroundColor: Colors.white.withValues(alpha: 0.3),
-                  valueColor: const AlwaysStoppedAnimation(Colors.white),
-                  minHeight: 6,
-                ),
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                S.of(context).t('review_desc'),
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
-              
-              const SizedBox(height: 12),
-              
+              const SizedBox(height: AppSpacing.xl),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '$mastered / $total thẻ đã thuộc',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      color: Colors.white.withValues(alpha: 0.9),
+                  Expanded(
+                    child: _TopMetricChip(
+                      icon: Icons.style_rounded,
+                      value: '$_dueCardsCount',
+                      label: S.of(context).t('review_due_cards'),
+                      color: AppColors.primary,
                     ),
                   ),
-                  Text(
-                    '${(masteryPercent * 100).toInt()}%',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: _TopMetricChip(
+                      icon: Icons.local_fire_department_rounded,
+                      value: '$_streakDays',
+                      label: S.of(context).t('review_streak'),
+                      color: AppColors.warning,
                     ),
                   ),
                 ],
               ),
+              if (_dueCardsCount > 0) ...[
+                const SizedBox(height: AppSpacing.xl),
+                PrimaryButton(
+                  label: S.of(context).t('review_start'),
+                  expand: false,
+                  icon: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                  onPressed: () => context.push('/flashcard/session'),
+                ),
+              ],
             ],
           ),
         ),
@@ -510,32 +210,298 @@ class _ReviewHubScreenState extends State<ReviewHubScreen> {
     );
   }
 
-  Widget _buildStudyButton(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: SizedBox(
-        width: double.infinity,
-        height: 56,
-        child: ElevatedButton.icon(
-          onPressed: () => context.push('/flashcard/session'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.success,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            elevation: 4,
+  Widget _buildOverviewSection(BuildContext context) {
+    final totalCards =
+        _statistics['totalCards'] as int? ??
+        _decks.fold<int>(0, (sum, deck) => sum + deck.totalCards);
+    final masteredCards = _statistics['masteredCards'] as int? ?? 0;
+    final masteryPercent =
+        totalCards > 0 ? (masteredCards / totalCards * 100).round() : 0;
+
+    return ModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(
+            title: S.of(context).t('review_overview'),
+            subtitle: S.of(context).t('review_overview_desc'),
           ),
-          icon: const Icon(Icons.play_arrow, color: Colors.white, size: 28),
-          label: Text(
-            'Bắt đầu ôn tập',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
+          const SizedBox(height: AppSpacing.xl),
+          Row(
+            children: [
+              Expanded(
+                child: _OverviewMetric(
+                  value: '$totalCards',
+                  label: S.of(context).t('review_total_cards'),
+                  color: AppColors.info,
+                ),
+              ),
+              Expanded(
+                child: _OverviewMetric(
+                  value: '$masteredCards',
+                  label: S.of(context).t('review_mastered'),
+                  color: AppColors.success,
+                ),
+              ),
+              Expanded(
+                child: _OverviewMetric(
+                  value: '$masteryPercent%',
+                  label: S.of(context).t('review_mastery'),
+                  color: AppColors.warning,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeckSection(BuildContext context) {
+    if (_decks.isEmpty) {
+      return EmptyStateWidget(
+        title: S.of(context).t('review_no_deck'),
+        message: S.of(context).t('review_no_deck_msg'),
+        icon: Icons.style_outlined,
+        actionLabel: S.of(context).t('review_create_fc'),
+        onAction: () => context.push('/flashcard/create'),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader(
+          title: S.of(context).t('review_your_decks'),
+          subtitle: '${_decks.length} ${S.of(context).t('review_decks_subtitle')}',
+          trailing: TextButton(
+            onPressed: () => context.push('/flashcard/create'),
+            child: Text(S.of(context).t('review_add_new')),
           ),
         ),
+        const SizedBox(height: AppSpacing.lg),
+        ..._decks.asMap().entries.map((entry) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: entry.key == _decks.length - 1 ? 0 : AppSpacing.md,
+            ),
+            child: _DeckCard(
+              deck: entry.value,
+              index: entry.key,
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+class _TopMetricChip extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color color;
+
+  const _TopMetricChip({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.84),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 18, color: color),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(value, style: Theme.of(context).textTheme.titleMedium),
+              Text(label, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OverviewMetric extends StatelessWidget {
+  final String value;
+  final String label;
+  final Color color;
+
+  const _OverviewMetric({
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: Theme.of(
+            context,
+          ).textTheme.headlineMedium?.copyWith(color: color),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall,
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}
+
+class _DeckCard extends StatelessWidget {
+  final FlashcardDeck deck;
+  final int index;
+
+  const _DeckCard({required this.deck, required this.index});
+
+  @override
+  Widget build(BuildContext context) {
+    final total = deck.totalCards;
+    final due = deck.dueCards;
+    final mastered = deck.masteredCards;
+    final masteryPercent = total > 0 ? mastered / total : 0.0;
+    final gradient = AppColors.deckGradients[index % AppColors.deckGradients.length];
+
+    return ModernCard(
+      gradient: gradient,
+      elevated: true,
+      onTap:
+          due > 0 ? () => context.push('/flashcard/session?deckId=${deck.userBookId}') : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      deck.bookTitle,
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        color: Colors.white,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      due > 0
+                          ? '$due ${S.of(context).t('review_due_msg')}'
+                          : S.of(context).t('review_done_msg'),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.92),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  due > 0 ? S.of(context).t('review_need') : S.of(context).t('review_done'),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: masteryPercent,
+              minHeight: 8,
+              backgroundColor: Colors.white.withValues(alpha: 0.26),
+              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              _DeckStat(
+                value: '$total',
+                label: S.of(context).t('review_total_cards'),
+              ),
+              const SizedBox(width: AppSpacing.xl),
+              _DeckStat(
+                value: '$mastered',
+                label: S.of(context).t('review_mastered'),
+              ),
+              const Spacer(),
+              Text(
+                '${(masteryPercent * 100).round()}%',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DeckStat extends StatelessWidget {
+  final String value;
+  final String label;
+
+  const _DeckStat({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          value,
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(color: Colors.white),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Colors.white.withValues(alpha: 0.85),
+          ),
+        ),
+      ],
     );
   }
 }

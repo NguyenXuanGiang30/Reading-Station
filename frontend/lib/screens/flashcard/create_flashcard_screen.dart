@@ -1,16 +1,26 @@
-/// CreateFlashcardScreen - Tạo flashcard thủ công
+/// CreateFlashcardScreen - Tao flashcard thu cong
 library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../theme/colors.dart';
+import '../../models/book.dart';
 import '../../services/flashcard_service.dart';
-import '../../models/flashcard.dart';
+import '../../services/user_book_service.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_gradients.dart';
+import '../../theme/app_spacing.dart';
+import '../../utils/validators.dart';
+import '../../widgets/common/custom_app_bar.dart';
+import '../../widgets/common/custom_text_field.dart';
+import '../../widgets/common/modern_card.dart';
+import '../../widgets/common/primary_button.dart';
+import '../../widgets/common/section_header.dart';
+import '../../widgets/states/loading_widget.dart';
+import '../../l10n/app_localizations.dart';
 
 class CreateFlashcardScreen extends StatefulWidget {
-  final String? deckId; // Optional: pre-select a deck
+  final String? deckId;
 
   const CreateFlashcardScreen({super.key, this.deckId});
 
@@ -20,86 +30,21 @@ class CreateFlashcardScreen extends StatefulWidget {
 
 class _CreateFlashcardScreenState extends State<CreateFlashcardScreen> {
   final FlashcardService _service = FlashcardService();
-  final _formKey = GlobalKey<FormState>();
-  final _frontController = TextEditingController();
-  final _backController = TextEditingController();
-  
-  String? _selectedDeckId;
-  List<FlashcardDeck> _decks = [];
+  final UserBookService _userBookService = UserBookService();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _frontController = TextEditingController();
+  final TextEditingController _backController = TextEditingController();
+
+  String? _selectedBookId;
+  List<UserBook> _books = [];
   bool _isLoading = false;
-  bool _isLoadingDecks = true;
+  bool _isLoadingBooks = true;
 
   @override
   void initState() {
     super.initState();
-    _selectedDeckId = widget.deckId;
-    _loadDecks();
-  }
-
-  Future<void> _loadDecks() async {
-    try {
-      final decks = await _service.getDecks();
-      if (mounted) {
-        setState(() {
-          _decks = decks;
-          _isLoadingDecks = false;
-          // Auto-select first deck if none selected and decks available
-          if (_selectedDeckId == null && _decks.isNotEmpty) {
-            _selectedDeckId = _decks.first.userBookId;
-          }
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingDecks = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi tải danh sách bộ thẻ: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _saveFlashcard() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_selectedDeckId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng chọn bộ thẻ (sách)')),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      await _service.createCard(
-        deckId: _selectedDeckId!,
-        front: _frontController.text.trim(),
-        back: _backController.text.trim(),
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Đã tạo flashcard thành công'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        context.pop(true); // Return true to indicate success
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
+    _selectedBookId = widget.deckId;
+    _loadBooks();
   }
 
   @override
@@ -109,144 +54,248 @@ class _CreateFlashcardScreenState extends State<CreateFlashcardScreen> {
     super.dispose();
   }
 
+  Future<void> _loadBooks() async {
+    try {
+      final response = await _userBookService.getUserBooks(page: 0, size: 100);
+      final content = response['content'] as List? ?? const [];
+      final books =
+          content
+              .map((item) => UserBook.fromJson(item as Map<String, dynamic>))
+              .toList();
+
+      if (!mounted) return;
+      setState(() {
+        _books = books;
+        _isLoadingBooks = false;
+        if (_selectedBookId == null && _books.isNotEmpty) {
+          _selectedBookId = _books.first.book.id;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoadingBooks = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${S.of(context).t("create_fc_load_err")}: $e')),
+      );
+    }
+  }
+
+  Future<void> _saveFlashcard() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_selectedBookId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(S.of(context).t('focus_select_book'))),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await _service.createCard(
+        deckId: _selectedBookId!,
+        front: _frontController.text.trim(),
+        back: _backController.text.trim(),
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(S.of(context).t('create_fc_saved'))),
+      );
+      context.pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Loi: $e')));
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Tạo Flashcard',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+      appBar: CustomAppBar(
+        title: S.of(context).t('takeaway_create_fc'),
+        leading: IconButton(
+          onPressed: () => context.pop(),
+          icon: const Icon(Icons.close_rounded),
         ),
-        actions: [
-          TextButton(
-            onPressed: _isLoading ? null : _saveFlashcard,
-            child: _isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(
-                    'Lưu',
-                    style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primaryStart,
-                    ),
-                  ),
-          ),
-        ],
       ),
-      body: _isLoadingDecks
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Form(
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: PrimaryButton(
+          label: S.of(context).t('create_fc_save'),
+          loading: _isLoading,
+          onPressed: _isLoading ? null : _saveFlashcard,
+        ),
+      ),
+      body:
+          _isLoadingBooks
+              ? SafeArea(
+                child: LoadingWidget(
+                  fullScreen: true,
+                  message: S.of(context).t('create_fc_loading'),
+                ),
+              )
+              : Form(
                 key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
                   children: [
-                    // Deck Selection
-                    Text(
-                      'Bộ thẻ (Sách)',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: _selectedDeckId,
-                      items: _decks.map((deck) {
-                        return DropdownMenuItem(
-                          value: deck.userBookId,
-                          child: Text(
-                            deck.bookTitle,
-                            overflow: TextOverflow.ellipsis,
+                    ModernCard(
+                      gradient: AppGradients.warmHero,
+                      elevated: true,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SectionHeader(
+            title: S.of(context).t('create_fc_add_deck'),
+                            subtitle: S.of(context).t('create_fc_hero_desc'),
                           ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() => _selectedDeckId = value);
-                      },
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: isDark ? AppColors.cardDark : Colors.grey.shade50,
-                      ),
-                      hint: const Text('Chọn bộ thẻ'),
-                      isExpanded: true,
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Front
-                    Text(
-                      'Mặt trước (Câu hỏi)',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                          const SizedBox(height: AppSpacing.xl),
+                          if (_selectedBookId != null && _books.isNotEmpty)
+                            _SelectedBookPreview(
+                              userBook:
+                                  _books.firstWhere(
+                                    (book) => book.book.id == _selectedBookId,
+                                    orElse: () => _books.first,
+                                  ),
+                            ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _frontController,
-                      maxLines: 3,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Vui lòng nhập câu hỏi';
-                        }
-                        return null;
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'Nhập câu hỏi...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: isDark ? AppColors.cardDark : Colors.grey.shade50,
+                    const SizedBox(height: AppSpacing.xl),
+                    ModernCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SectionHeader(
+                            title: S.of(context).t('create_fc_linked_book'),
+                            subtitle: S.of(context).t('create_fc_linked_desc'),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          DropdownButtonFormField<String>(
+                            initialValue: _selectedBookId,
+                            decoration: InputDecoration(
+                              labelText: S.of(context).t('focus_select_book'),
+                            ),
+                            items:
+                                _books
+                                    .map(
+                                      (userBook) => DropdownMenuItem<String>(
+                                        value: userBook.book.id,
+                                        child: Text(
+                                          userBook.book.title,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                            onChanged: (value) {
+                              setState(() => _selectedBookId = value);
+                            },
+                            isExpanded: true,
+                          ),
+                        ],
                       ),
                     ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Back
-                    Text(
-                      'Mặt sau (Câu trả lời)',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _backController,
-                      maxLines: 5,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Vui lòng nhập câu trả lời';
-                        }
-                        return null;
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'Nhập câu trả lời...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: isDark ? AppColors.cardDark : Colors.grey.shade50,
+                    const SizedBox(height: AppSpacing.xl),
+                    ModernCard(
+                      child: Column(
+                        children: [
+                          CustomTextField(
+                            controller: _frontController,
+                            label: S.of(context).t('fc_session_front'),
+                            hint: S.of(context).t('create_fc_front_hint'),
+                            maxLines: 3,
+                            textCapitalization: TextCapitalization.sentences,
+                            validator: (value) {
+                              final result = Validators.required(
+                                value,
+                                fieldName: S.of(context).t('create_fc_front_field'),
+                              );
+                              return result.isValid ? null : result.errorMessage;
+                            },
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          CustomTextField(
+                            controller: _backController,
+                            label: S.of(context).t('fc_session_back'),
+                            hint: S.of(context).t('create_fc_back_hint'),
+                            maxLines: 5,
+                            textCapitalization: TextCapitalization.sentences,
+                            validator: (value) {
+                              final result = Validators.required(
+                                value,
+                                fieldName: S.of(context).t('create_fc_back_field'),
+                              );
+                              return result.isValid ? null : result.errorMessage;
+                            },
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
+    );
+  }
+}
+
+class _SelectedBookPreview extends StatelessWidget {
+  final UserBook userBook;
+
+  const _SelectedBookPreview({required this.userBook});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 56,
+          height: 78,
+          decoration: BoxDecoration(
+            gradient: AppColors.primaryGradient,
+            borderRadius: BorderRadius.circular(14),
+            image:
+                userBook.book.coverUrl != null && userBook.book.coverUrl!.isNotEmpty
+                    ? DecorationImage(
+                      image: NetworkImage(userBook.book.coverUrl!),
+                      fit: BoxFit.cover,
+                    )
+                    : null,
+          ),
+          child:
+              userBook.book.coverUrl == null || userBook.book.coverUrl!.isEmpty
+                  ? const Icon(Icons.auto_stories_rounded, color: Colors.white)
+                  : null,
+        ),
+        const SizedBox(width: AppSpacing.lg),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                userBook.book.title,
+                style: Theme.of(context).textTheme.titleMedium,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                userBook.book.author,
+                style: Theme.of(context).textTheme.bodySmall,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

@@ -3,16 +3,25 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
 
-import '../../theme/colors.dart';
 import '../../models/book.dart';
-import '../../services/user_book_service.dart';
 import '../../services/reading_progress_service.dart';
+import '../../services/user_book_service.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_gradients.dart';
+import '../../theme/app_spacing.dart';
+import '../../widgets/common/modern_card.dart';
+import '../../widgets/common/section_header.dart';
+import '../../widgets/data/info_tile.dart';
+import '../../widgets/data/status_chip.dart';
+import '../../widgets/states/error_state_widget.dart';
+import '../../widgets/states/loading_widget.dart';
+import '../../l10n/app_localizations.dart';
 
 class BookDetailScreen extends StatefulWidget {
   final String bookId;
-  
+
   const BookDetailScreen({super.key, required this.bookId});
 
   @override
@@ -21,772 +30,542 @@ class BookDetailScreen extends StatefulWidget {
 
 class _BookDetailScreenState extends State<BookDetailScreen> {
   final UserBookService _userBookService = UserBookService();
-  final ReadingProgressService _progressService = ReadingProgressService();
-  
+  final ReadingProgressService _readingProgressService = ReadingProgressService();
+
   Map<String, dynamic>? _book;
   bool _isLoading = true;
   String? _error;
-  
+
+  List<dynamic> _friendsWhoRead = [];
+  bool _loadingFriends = false;
+
   @override
   void initState() {
     super.initState();
     _loadBook();
+    _loadFriendsWhoRead();
   }
-  
+
   Future<void> _loadBook() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
-    
+
     try {
-      final book = await _userBookService.getUserBookById(widget.bookId);
-      if (book != null) {
-        // Parse status from API
-        final statusStr = book['status'] as String? ?? 'WANT_TO_READ';
-        ReadingStatus status;
-        switch (statusStr.toUpperCase()) {
-          case 'READING':
-            status = ReadingStatus.reading;
-            break;
-          case 'READ':
-          case 'COMPLETED':
-            status = ReadingStatus.read;
-            break;
-          default:
-            status = ReadingStatus.wantToRead;
-        }
-        
-        final currentPage = book['currentPage'] as int? ?? 0;
-        final totalPages = book['totalPages'] as int? ?? 1;
-        final progress = totalPages > 0 ? currentPage / totalPages : 0.0;
-        
-        setState(() {
-          _book = {
-            ...book,
-            'status': status,
-            'progress': progress,
-            'startDate': book['startDate'] ?? 'N/A',
-            'lastReadDate': book['lastReadDate'] ?? 'N/A',
-          };
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _error = 'Không tìm thấy sách';
-          _isLoading = false;
-        });
+      final results = await Future.wait([
+        _userBookService.getUserBookById(widget.bookId),
+        _userBookService.getUserBookStats(widget.bookId),
+      ]);
+      final book = results[0];
+      final stats = results[1] as Map<String, dynamic>;
+      if (book == null) {
+        throw Exception(S.of(context).t('book_not_found'));
       }
-    } catch (e) {
+
+      final status = ReadingStatus.fromString(book['status'] as String?);
+      final currentPage =
+          stats['currentPage'] as int? ?? book['currentPage'] as int? ?? 0;
+      final totalPages =
+          stats['totalPages'] as int? ??
+          book['totalPages'] as int? ??
+          (book['book']?['totalPages'] as int?) ??
+          0;
+      final safePages = totalPages == 0 ? 1 : totalPages;
+      final bookData = Map<String, dynamic>.from(
+        (book['book'] as Map?)?.cast<String, dynamic>() ?? const {},
+      );
+      bookData['coverUrl'] = bookData['coverUrl'] ?? bookData['coverImageUrl'];
+      bookData['totalPages'] = safePages;
+
+      if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _book = {
+          ...book,
+          ...stats,
+          'status': status,
+          'currentPage': currentPage,
+          'totalPages': safePages,
+          'progress': (currentPage / safePages).clamp(0.0, 1.0),
+          'book': bookData,
+          'startDate': book['startDate'] ?? book['startedAt'],
+          'lastReadDate':
+              book['lastReadDate'] ??
+              book['updatedAt'] ??
+              book['completedAt'] ??
+              book['startedAt'],
+          'notesCount': book['notesCount'] ?? 0,
+          'flashcardsCount': book['flashcardsCount'] ?? 0,
+          'location': book['location'] ?? S.of(context).t('book_detail_not_updated'),
+          'rating': book['rating'] ?? 0,
+        };
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '');
         _isLoading = false;
       });
     }
   }
 
+  Future<void> _loadFriendsWhoRead() async {
+    setState(() => _loadingFriends = true);
+    try {
+      final friends = await _userBookService.getFriendsWhoReadBook(
+        widget.bookId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _friendsWhoRead = friends;
+        _loadingFriends = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _friendsWhoRead = [];
+        _loadingFriends = false;
+      });
+    }
+  }
+
+  void _shareBook() {
+    if (_book == null) return;
+    final book = _book!['book'] as Map<String, dynamic>;
+    final title = book['title'] ?? S.of(context).t('book_default_title');
+    final author = book['author'] ?? '';
+    final description = book['description'] ?? '';
+    final shareText =
+        '📚 $title\n'
+        '✍️ $author\n\n'
+        '${description.toString().length > 150 ? '${description.toString().substring(0, 150)}...' : description}\n\n'
+        '${S.of(context).t("book_share_text")}';
+
+    Share.share(shareText);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new),
-            onPressed: () => context.pop(),
-          ),
-        ),
-        body: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(color: AppColors.primaryStart),
-              SizedBox(height: 16),
-              Text('Đang tải...'),
-            ],
-          ),
+        body: LoadingWidget(
+          fullScreen: true,
+          message: S.of(context).t('book_detail_loading'),
         ),
       );
     }
-    
+
     if (_error != null || _book == null) {
       return Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new),
-            onPressed: () => context.pop(),
-          ),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64, color: AppColors.error),
-              const SizedBox(height: 16),
-              Text(_error ?? 'Không tìm thấy sách'),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: _loadBook,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Thử lại'),
-              ),
-            ],
-          ),
+        appBar: AppBar(),
+        body: ErrorStateWidget(
+          message: _error ?? S.of(context).t('book_detail_not_found'),
+          onRetry: _loadBook,
         ),
       );
     }
-    
+
+    final bookData = _book!['book'] as Map<String, dynamic>;
+    final progress = _book!['progress'] as double;
+
     return Scaffold(
+      bottomNavigationBar: _buildBottomBar(context),
       body: RefreshIndicator(
         onRefresh: _loadBook,
-        color: AppColors.primaryStart,
         child: CustomScrollView(
           slivers: [
-            _buildAppBar(context, isDark),
-            SliverToBoxAdapter(
-              child: _buildContent(context, isDark),
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: _buildBottomActions(context, isDark),
-    );
-  }
-
-  Widget _buildAppBar(BuildContext context, bool isDark) {
-    final book = _book!;
-    final progress = book['progress'] as double? ?? 0.0;
-    
-    return SliverAppBar(
-      expandedHeight: 280,
-      pinned: true,
-      backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
-      leading: IconButton(
-        icon: Icon(Icons.arrow_back_ios_new, 
-          color: isDark ? Colors.white : AppColors.textPrimaryLight,
-          size: 18),
-        onPressed: () => context.pop(),
-      ),
-      actions: [
-        IconButton(
-          icon: Icon(Icons.edit, 
-            color: isDark ? Colors.white70 : AppColors.textSecondaryLight,
-            size: 20),
-          onPressed: () => context.push('/book/${widget.bookId}/edit'),
-        ),
-        IconButton(
-          icon: Icon(Icons.more_vert, 
-            color: isDark ? Colors.white70 : AppColors.textSecondaryLight,
-            size: 20),
-          onPressed: () => _showMoreOptions(context),
-        ),
-      ],
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          color: isDark ? AppColors.surfaceDark : Colors.white,
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Book cover
-                  Container(
-                    width: 120,
-                    height: 180,
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryStart.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: AppColors.primaryStart.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.menu_book,
-                      size: 60,
-                      color: AppColors.primaryStart,
-                    ),
-                  ),
-                  
-                  const SizedBox(width: 20),
-                  
-                  // Book info
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          _book!['title'],
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _book!['author'],
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 14,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        // Progress
-                        Text(
-                          '${(_book!['currentPage'])}/${_book!['totalPages']} trang',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(2),
-                          child: LinearProgressIndicator(
-                            value: progress,
-                            backgroundColor: AppColors.primaryStart.withValues(alpha: 0.2),
-                            valueColor: const AlwaysStoppedAnimation(AppColors.primaryStart),
-                            minHeight: 6,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${(progress * 100).toInt()}% hoàn thành',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.primaryStart,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildContent(BuildContext context, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Status badge and rating
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _getStatusColor(_book!['status']).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
+            SliverAppBar(
+              expandedHeight: 360,
+              pinned: true,
+              stretch: true,
+              actions: [
+                IconButton(
+                  onPressed: () => context.push('/book/${widget.bookId}/edit'),
+                  icon: const Icon(Icons.edit_outlined),
                 ),
-                child: Text(
-                  (_book!['status'] as ReadingStatus).label,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: _getStatusColor(_book!['status']),
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Row(
-                children: [
-                  const Icon(Icons.star, color: AppColors.warning, size: 20),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${_book!['rating']}',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Action cards
-          _buildQuickActions(context, isDark),
-          
-          const SizedBox(height: 24),
-          
-          // Description
-          Text(
-            'Mô tả',
-            style: GoogleFonts.inter(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            _book!['description'],
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              height: 1.6,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-            ),
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Book info
-          _buildInfoSection(isDark),
-          
-          const SizedBox(height: 24),
-          
-          // Friends who read this book
-          _buildFriendsWhoRead(context, isDark),
-          
-          const SizedBox(height: 24),
-          
-          // Reading stats
-          _buildReadingStats(isDark),
-          
-          const SizedBox(height: 100),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActions(BuildContext context, bool isDark) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildActionCard(
-            icon: Icons.note_alt_outlined,
-            label: 'Ghi chú',
-            value: '${_book!['notesCount']}',
-            color: AppColors.info,
-            isDark: isDark,
-            onTap: () => context.push('/book/${widget.bookId}/notes'),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildActionCard(
-            icon: Icons.style_outlined,
-            label: 'Flashcard',
-            value: '${_book!['flashcardsCount']}',
-            color: AppColors.success,
-            isDark: isDark,
-            onTap: () => context.push('/flashcard/session?bookId=${widget.bookId}'),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildActionCard(
-            icon: Icons.location_on_outlined,
-            label: 'Vị trí',
-            value: _book!['location'],
-            color: AppColors.warning,
-            isDark: isDark,
-            onTap: () => _showLocationInfo(context),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionCard({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color color,
-    required bool isDark,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.cardDark : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: isDark ? [] : [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              value,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoSection(bool isDark) {
-    final infoItems = [
-      {'icon': Icons.category, 'label': 'Thể loại', 'value': _book!['category']},
-      {'icon': Icons.business, 'label': 'NXB', 'value': _book!['publisher']},
-      {'icon': Icons.calendar_today, 'label': 'Năm', 'value': '${_book!['publishedYear']}'},
-      {'icon': Icons.qr_code, 'label': 'ISBN', 'value': _book!['isbn']},
-    ];
-    
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: isDark ? [] : [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Thông tin sách',
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ...infoItems.map((item) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              children: [
-                Icon(
-                  item['icon'] as IconData,
-                  size: 20,
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  '${item['label']}:',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    item['value'] as String,
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                    ),
-                    textAlign: TextAlign.end,
-                  ),
+                IconButton(
+                  onPressed: () => _showMoreOptions(context),
+                  icon: const Icon(Icons.more_horiz_rounded),
                 ),
               ],
-            ),
-          )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReadingStats(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: isDark ? [] : [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Thống kê đọc',
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatItem(
-                  icon: Icons.play_arrow,
-                  label: 'Bắt đầu',
-                  value: _book!['startDate'],
-                  isDark: isDark,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: const BoxDecoration(
+                    gradient: AppGradients.warmHero,
+                  ),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Hero(
+                                tag: 'book-cover-${widget.bookId}',
+                                child: _BookCover(
+                                  coverUrl:
+                                      (bookData['coverUrl'] ??
+                                              bookData['coverImageUrl'])
+                                          as String?,
+                                  title: bookData['title']?.toString() ?? '',
+                                  width: 132,
+                                  height: 196,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.xl),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    StatusChip(
+                                      label: (_book!['status'] as ReadingStatus)
+                                          .label,
+                                      color: _getStatusColor(
+                                        _book!['status'] as ReadingStatus,
+                                      ),
+                                      icon: Icons.bookmark_rounded,
+                                    ),
+                                    const SizedBox(height: AppSpacing.lg),
+                                    Text(
+                                      bookData['title']?.toString() ?? '',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.displayMedium,
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: AppSpacing.sm),
+                                    Text(
+                                      bookData['author']?.toString() ?? '',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge
+                                          ?.copyWith(
+                                            color: AppColors.textSecondary,
+                                          ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.lg),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(999),
+                                      child: LinearProgressIndicator(
+                                        value: progress,
+                                        minHeight: 8,
+                                        backgroundColor: Colors.white
+                                            .withValues(alpha: 0.4),
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.sm),
+                                    Text(
+                                      '${_book!['currentPage']}/${_book!['totalPages']} ${S.of(context).t('home_pages')} • ${(progress * 100).toStringAsFixed(0)}%',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
-              Expanded(
-                child: _buildStatItem(
-                  icon: Icons.update,
-                  label: 'Đọc gần nhất',
-                  value: _book!['lastReadDate'],
-                  isDark: isDark,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItem({
-    required IconData icon,
-    required String label,
-    required String value,
-    required bool isDark,
-  }) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: AppColors.primaryStart),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              ),
             ),
-            Text(
-              value,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 120),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildActionStrip(context),
+                    const SizedBox(height: AppSpacing.xxxl),
+                    ModernCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SectionHeader(
+                            title: S.of(context).t('book_detail_desc'),
+                            subtitle: S.of(context).t('book_detail_desc_sub'),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          Text(
+                            bookData['description']?.toString().isNotEmpty ==
+                                    true
+                                ? bookData['description'].toString()
+                                : S.of(context).t('book_detail_no_desc'),
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xxl),
+                    ModernCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SectionHeader(
+            title: S.of(context).t('book_info'),
+                            subtitle: S.of(context).t('book_info_subtitle'),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          InfoTile(
+                            icon: Icons.category_outlined,
+                            label: S.of(context).t('add_book_category'),
+                            value:
+                                bookData['category']?.toString() ?? S.of(context).t('book_unknown'),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          InfoTile(
+                            icon: Icons.business_outlined,
+                            label: S.of(context).t('add_book_publisher'),
+                            value:
+                                bookData['publisher']?.toString() ?? S.of(context).t('book_unknown'),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          InfoTile(
+                            icon: Icons.confirmation_number_outlined,
+                            label: S.of(context).t('book_field_isbn'),
+                            value: bookData['isbn']?.toString() ?? S.of(context).t('book_detail_unknown'),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          InfoTile(
+                            icon: Icons.place_outlined,
+                            label: S.of(context).t('book_location'),
+                            value:
+                                _book!['location']?.toString() ??
+                                S.of(context).t('book_detail_not_updated'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xxl),
+                    ModernCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SectionHeader(
+            title: S.of(context).t('book_reading_stats'),
+                            subtitle: S.of(context).t('book_stats_subtitle'),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _StatTile(
+                                  label: S.of(context).t('book_detail_started'),
+                                  value: _formatDate(_book!['startDate']),
+                                  icon: Icons.play_circle_outline_rounded,
+                                  color: AppColors.secondary,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.md),
+                              Expanded(
+                                child: _StatTile(
+                                  label: S.of(context).t('book_detail_last_read'),
+                                  value: _formatDate(_book!['lastReadDate']),
+                                  icon: Icons.history_toggle_off_rounded,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_loadingFriends)
+                      Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.xxl),
+                        child: LoadingWidget(
+                          message: S.of(context).t('book_detail_loading_friends'),
+                        ),
+                      )
+                    else if (_friendsWhoRead.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.xxl),
+                      ModernCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SectionHeader(
+                              title: S.of(context).t('book_detail_friends_reading'),
+                              subtitle:
+                                  '${_friendsWhoRead.length} ${S.of(context).t('book_detail_friends_count')}',
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                            SizedBox(
+                              height: 92,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: _friendsWhoRead.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(width: AppSpacing.md),
+                                itemBuilder: (context, index) {
+                                  final friend =
+                                      _friendsWhoRead[index]
+                                          as Map<String, dynamic>;
+                                  final name =
+                                      friend['fullName'] ??
+                                      friend['name'] ??
+                                      friend['displayName'] ??
+                                      S.of(context).t('profile_reader');
+                                  return GestureDetector(
+                                    onTap: () =>
+                                        context.push('/friend/${friend['id']}'),
+                                    child: Column(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 28,
+                                          backgroundColor:
+                                              AppColors.primarySoft,
+                                          backgroundImage:
+                                              friend['avatarUrl'] != null
+                                              ? NetworkImage(
+                                                  friend['avatarUrl'] as String,
+                                                )
+                                              : null,
+                                          child: friend['avatarUrl'] == null
+                                              ? Text(
+                                                  name
+                                                      .toString()
+                                                      .substring(0, 1)
+                                                      .toUpperCase(),
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .titleLarge
+                                                      ?.copyWith(
+                                                        color:
+                                                            AppColors.primary,
+                                                      ),
+                                                )
+                                              : null,
+                                        ),
+                                        const SizedBox(height: AppSpacing.sm),
+                                        SizedBox(
+                                          width: 72,
+                                          child: Text(
+                                            name.toString(),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            textAlign: TextAlign.center,
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.bodySmall,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ],
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildFriendsWhoRead(BuildContext context, bool isDark) {
-    // Mock data - will be replaced with API data
-    final friends = [
-      {'id': '1', 'name': 'Minh Anh', 'avatar': null, 'rating': 5},
-      {'id': '2', 'name': 'Hà My', 'avatar': null, 'rating': 4},
-      {'id': '3', 'name': 'Tuấn', 'avatar': null, 'rating': 5},
-      {'id': '4', 'name': 'Linh', 'avatar': null, 'rating': 4},
-    ];
-    
-    if (friends.isEmpty) return const SizedBox.shrink();
-    
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: isDark ? [] : [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+  Widget _buildActionStrip(BuildContext context) {
+    final bookData = _book!['book'] as Map<String, dynamic>;
+    final actions = [
+      (
+        S.of(context).t('book_detail_notes'),
+        '${_book!['notesCount']}',
+        AppColors.info,
+        Icons.note_alt_outlined,
+        () => context.push('/book/${widget.bookId}/notes'),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.people,
-                size: 20,
-                color: AppColors.primaryStart,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '${friends.length} bạn bè đã đọc sách này',
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // Avatar grid
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: friends.map((friend) {
-              return GestureDetector(
-                onTap: () => context.push('/friend/${friend['id']}'),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        gradient: AppColors.primaryGradient,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          (friend['name'] as String).substring(0, 1).toUpperCase(),
-                          style: GoogleFonts.inter(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
+      (
+        'Flashcard',
+        '${_book!['flashcardsCount']}',
+        AppColors.secondary,
+        Icons.style_outlined,
+        () => context.push('/flashcard/session?deckId=${bookData['id']}'),
+      ),
+      (
+        S.of(context).t('book_detail_share'),
+        S.of(context).t('book_detail_share_now'),
+        AppColors.accent,
+        Icons.share_outlined,
+        _shareBook,
+      ),
+    ];
+
+    return Row(
+      children: actions.map((action) {
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(
+              right: action == actions.last ? 0 : AppSpacing.md,
+            ),
+            child: ModernCard(
+              onTap: action.$5,
+              child: Column(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: action.$3.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      friend['name'] as String,
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                      ),
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.star, size: 12, color: AppColors.warning),
-                        Text(
-                          '${friend['rating']}',
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 12),
-          // View all button
-          Center(
-            child: TextButton(
-              onPressed: () {
-                // TODO: Show all friends who read this book
-              },
-              child: Text(
-                'Xem tất cả đánh giá',
-                style: GoogleFonts.inter(
-                  color: AppColors.primaryStart,
-                  fontWeight: FontWeight.w500,
-                ),
+                    child: Icon(action.$4, color: action.$3),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    action.$1,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(action.$2, style: Theme.of(context).textTheme.bodySmall),
+                ],
               ),
             ),
           ),
-        ],
-      ),
+        );
+      }).toList(),
     );
   }
 
-  Widget _buildBottomActions(BuildContext context, bool isDark) {
+  Widget _buildBottomBar(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
-          ),
-        ],
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
       ),
       child: SafeArea(
+        top: false,
         child: Row(
           children: [
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: () => _updateProgress(context),
-                icon: const Icon(Icons.update),
-                label: const Text('Cập nhật'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  side: const BorderSide(color: AppColors.primaryStart),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
+                icon: const Icon(Icons.auto_graph_rounded),
+                label: Text(S.of(context).t('book_detail_update')),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () => context.push('/note/create?bookId=${widget.bookId}'),
-                icon: const Icon(Icons.add, color: Colors.white),
-                label: Text(
-                  'Ghi chú',
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryStart,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
+              child: FilledButton.icon(
+                onPressed: () =>
+                    context.push('/note/create?bookId=${widget.bookId}'),
+                icon: const Icon(Icons.edit_note_rounded),
+                label: Text(S.of(context).t('book_detail_notes')),
               ),
             ),
           ],
@@ -798,72 +577,54 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   Color _getStatusColor(ReadingStatus status) {
     switch (status) {
       case ReadingStatus.reading:
-        return AppColors.reading;
+        return AppColors.primary;
       case ReadingStatus.read:
-        return AppColors.completed;
+        return AppColors.success;
       case ReadingStatus.wantToRead:
-        return AppColors.wantToRead;
+        return AppColors.info;
     }
   }
 
   void _showMoreOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
+      builder: (dialogContext) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.share_outlined),
+                title: Text(S.of(context).t('book_detail_share_book')),
+                onTap: () {
+                  context.pop();
+                  _shareBook();
+                },
               ),
-            ),
-            const SizedBox(height: 24),
-            ListTile(
-              leading: const Icon(Icons.share),
-              title: const Text('Chia sẻ sách'),
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: Share
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.bookmark_add),
-              title: const Text('Thêm vào danh sách'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: AppColors.error),
-              title: const Text('Xóa sách', style: TextStyle(color: AppColors.error)),
-              onTap: () {
-                Navigator.pop(context);
-                _confirmDelete(context);
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showLocationInfo(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Vị trí: ${_book!['location']}'),
-        behavior: SnackBarBehavior.floating,
-      ),
+              ListTile(
+                leading: const Icon(Icons.bookmark_add_outlined),
+                title: Text(S.of(context).t('book_detail_add_list')),
+                onTap: () => context.pop(),
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: AppColors.error,
+                ),
+                title: Text(
+                  S.of(context).t('book_detail_delete'),
+                  style: const TextStyle(color: AppColors.error),
+                ),
+                onTap: () {
+                  context.pop();
+                  _confirmDelete(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -871,14 +632,19 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (context) => _UpdateProgressSheet(
-        currentPage: _book!['currentPage'],
-        totalPages: _book!['totalPages'],
-        onUpdate: (newPage) {
+        currentPage: _book!['currentPage'] as int,
+        totalPages: _book!['totalPages'] as int,
+        onUpdate: (newPage) async {
+          await _readingProgressService.updateProgress(
+            userBookId: widget.bookId,
+            currentPage: newPage,
+          );
+          if (!mounted) return;
           setState(() {
             _book!['currentPage'] = newPage;
-            _book!['progress'] = newPage / _book!['totalPages'];
+            _book!['progress'] = newPage / (_book!['totalPages'] as int);
+            _book!['lastReadDate'] = DateTime.now().toIso8601String();
           });
         },
       ),
@@ -888,21 +654,131 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   void _confirmDelete(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Xóa sách'),
-        content: const Text('Bạn có chắc muốn xóa sách này? Hành động này không thể hoàn tác.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(S.of(context).t('book_detail_delete')),
+          content: Text(
+            S.of(context).t('book_detail_delete_confirm'),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.pop();
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Xóa', style: TextStyle(color: Colors.white)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(S.of(context).t('book_detail_cancel')),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+              onPressed: () async {
+                final navigator = Navigator.of(dialogContext);
+                final messenger = ScaffoldMessenger.of(this.context);
+                final router = GoRouter.of(this.context);
+                navigator.pop();
+                try {
+                  await _userBookService.deleteUserBook(widget.bookId);
+                  if (!mounted) return;
+                  messenger.showSnackBar(
+                    SnackBar(content: Text(S.of(context).t('book_detail_deleted'))),
+                  );
+                  router.pop();
+                } catch (e) {
+                  if (!mounted) return;
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('$e'.replaceAll('Exception: ', ''))),
+                  );
+                }
+              },
+              child: Text(S.of(context).t('book_detail_delete')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _formatDate(dynamic value) {
+    if (value == null) return S.of(context).t('book_detail_not_updated');
+    final text = value.toString();
+    if (text.isEmpty || text == 'null') return S.of(context).t('book_detail_not_updated');
+    return text.length >= 10 ? text.substring(0, 10) : text;
+  }
+}
+
+class _BookCover extends StatelessWidget {
+  final String? coverUrl;
+  final String title;
+  final double width;
+  final double height;
+
+  const _BookCover({
+    required this.coverUrl,
+    required this.title,
+    required this.width,
+    required this.height,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          gradient: AppColors
+              .deckGradients[title.length % AppColors.deckGradients.length],
+          image: coverUrl != null && coverUrl!.isNotEmpty
+              ? DecorationImage(
+                  image: NetworkImage(coverUrl!),
+                  fit: BoxFit.cover,
+                )
+              : null,
+        ),
+        child: coverUrl == null || coverUrl!.isEmpty
+            ? const Center(
+                child: Icon(
+                  Icons.auto_stories_rounded,
+                  size: 48,
+                  color: Colors.white,
+                ),
+              )
+            : null,
+      ),
+    );
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const _StatTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(height: AppSpacing.md),
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium,
           ),
         ],
       ),
@@ -913,8 +789,8 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
 class _UpdateProgressSheet extends StatefulWidget {
   final int currentPage;
   final int totalPages;
-  final Function(int) onUpdate;
-  
+  final Future<void> Function(int newPage) onUpdate;
+
   const _UpdateProgressSheet({
     required this.currentPage,
     required this.totalPages,
@@ -926,16 +802,17 @@ class _UpdateProgressSheet extends StatefulWidget {
 }
 
 class _UpdateProgressSheetState extends State<_UpdateProgressSheet> {
-  late TextEditingController _controller;
+  late final TextEditingController _controller;
   late int _selectedPage;
-  
+  bool _isSubmitting = false;
+
   @override
   void initState() {
     super.initState();
     _selectedPage = widget.currentPage;
     _controller = TextEditingController(text: '$_selectedPage');
   }
-  
+
   @override
   void dispose() {
     _controller.dispose();
@@ -944,34 +821,22 @@ class _UpdateProgressSheetState extends State<_UpdateProgressSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        12,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 24,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(2),
-            ),
+          SectionHeader(
+            title: S.of(context).t('book_detail_update_progress'),
+            subtitle: S.of(context).t('book_detail_update_desc'),
           ),
-          const SizedBox(height: 24),
-          Text(
-            'Cập nhật tiến độ',
-            style: GoogleFonts.inter(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.xl),
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton(
                 onPressed: _selectedPage > 0
@@ -982,41 +847,27 @@ class _UpdateProgressSheetState extends State<_UpdateProgressSheet> {
                         });
                       }
                     : null,
-                icon: const Icon(Icons.remove_circle_outline),
-                iconSize: 32,
+                icon: const Icon(Icons.remove_circle_outline_rounded),
               ),
-              const SizedBox(width: 16),
-              SizedBox(
-                width: 80,
+              Expanded(
                 child: TextField(
                   controller: _controller,
                   keyboardType: TextInputType.number,
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
+                  style: Theme.of(context).textTheme.displayMedium,
+                  decoration: InputDecoration(
+                    labelText: S.of(context).t('book_detail_page_current'),
                   ),
                   onChanged: (value) {
                     final page = int.tryParse(value);
-                    if (page != null && page >= 0 && page <= widget.totalPages) {
-                      setState(() {
-                        _selectedPage = page;
-                      });
+                    if (page != null &&
+                        page >= 0 &&
+                        page <= widget.totalPages) {
+                      setState(() => _selectedPage = page);
                     }
                   },
                 ),
               ),
-              Text(
-                ' / ${widget.totalPages}',
-                style: GoogleFonts.inter(
-                  fontSize: 20,
-                  color: Colors.grey,
-                ),
-              ),
-              const SizedBox(width: 16),
               IconButton(
                 onPressed: _selectedPage < widget.totalPages
                     ? () {
@@ -1026,12 +877,11 @@ class _UpdateProgressSheetState extends State<_UpdateProgressSheet> {
                         });
                       }
                     : null,
-                icon: const Icon(Icons.add_circle_outline),
-                iconSize: 32,
+                icon: const Icon(Icons.add_circle_outline_rounded),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           Slider(
             value: _selectedPage.toDouble(),
             min: 0,
@@ -1042,31 +892,28 @@ class _UpdateProgressSheetState extends State<_UpdateProgressSheet> {
                 _controller.text = '$_selectedPage';
               });
             },
-            activeColor: AppColors.primaryStart,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.xl),
           SizedBox(
             width: double.infinity,
-            height: 56,
-            child: ElevatedButton(
-              onPressed: () {
-                widget.onUpdate(_selectedPage);
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryStart,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(
-                'Cập nhật',
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
+            child: FilledButton(
+              onPressed: _isSubmitting
+                  ? null
+                  : () async {
+                      final navigator = Navigator.of(context);
+                      setState(() => _isSubmitting = true);
+                      try {
+                        await widget.onUpdate(_selectedPage);
+                        if (mounted) {
+                          navigator.pop();
+                        }
+                      } finally {
+                        if (mounted) {
+                          setState(() => _isSubmitting = false);
+                        }
+                      }
+                    },
+              child: Text(S.of(context).t('book_detail_save_progress')),
             ),
           ),
         ],

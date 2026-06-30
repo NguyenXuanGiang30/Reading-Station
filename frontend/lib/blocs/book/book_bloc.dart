@@ -3,7 +3,6 @@ library;
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../models/book.dart';
 import '../../services/book_service.dart';
 import 'book_event.dart';
 import 'book_state.dart';

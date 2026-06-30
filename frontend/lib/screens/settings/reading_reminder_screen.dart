@@ -1,12 +1,20 @@
-/// ReadingReminderScreen - Cài đặt nhắc nhở đọc sách
+/// ReadingReminderScreen - Cai dat nhac nho doc sach
 library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../theme/colors.dart';
 import '../../services/settings_service.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_gradients.dart';
+import '../../theme/app_spacing.dart';
+import '../../widgets/common/custom_app_bar.dart';
+import '../../widgets/common/modern_card.dart';
+import '../../widgets/common/primary_button.dart';
+import '../../widgets/common/section_header.dart';
+import '../../widgets/settings/settings_section_card.dart';
+import '../../widgets/settings/settings_tile.dart';
+import '../../l10n/app_localizations.dart';
 
 class ReadingReminderScreen extends StatefulWidget {
   const ReadingReminderScreen({super.key});
@@ -17,7 +25,7 @@ class ReadingReminderScreen extends StatefulWidget {
 
 class _ReadingReminderScreenState extends State<ReadingReminderScreen> {
   final SettingsService _settingsService = SettingsService();
-  
+
   bool _enabled = true;
   TimeOfDay _time = const TimeOfDay(hour: 20, minute: 0);
   bool _isLoading = true;
@@ -31,14 +39,13 @@ class _ReadingReminderScreenState extends State<ReadingReminderScreen> {
   Future<void> _loadSettings() async {
     final enabled = await _settingsService.isReadingReminderEnabled();
     final timeMap = await _settingsService.getReadingReminderTime();
-    
-    if (mounted) {
-      setState(() {
-        _enabled = enabled;
-        _time = TimeOfDay(hour: timeMap['hour']!, minute: timeMap['minute']!);
-        _isLoading = false;
-      });
-    }
+
+    if (!mounted) return;
+    setState(() {
+      _enabled = enabled;
+      _time = TimeOfDay(hour: timeMap['hour']!, minute: timeMap['minute']!);
+      _isLoading = false;
+    });
   }
 
   Future<void> _updateEnabled(bool value) async {
@@ -47,285 +54,234 @@ class _ReadingReminderScreenState extends State<ReadingReminderScreen> {
   }
 
   Future<void> _selectTime() async {
-    final time = await showTimePicker(
-      context: context,
-      initialTime: _time,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: AppColors.primaryStart,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    
-    if (time != null && mounted) {
-      setState(() => _time = time);
-      await _settingsService.setReadingReminderTime(time.hour, time.minute);
-    }
+    final time = await showTimePicker(context: context, initialTime: _time);
+    if (time == null || !mounted) return;
+    setState(() => _time = time);
+    await _settingsService.setReadingReminderTime(time.hour, time.minute);
   }
 
   Future<void> _save() async {
     await _settingsService.setReadingReminderEnabled(_enabled);
     await _settingsService.setReadingReminderTime(_time.hour, _time.minute);
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _enabled 
-                ? 'Đã bật nhắc nhở lúc ${_time.format(context)}' 
-                : 'Đã tắt nhắc nhở đọc sách',
-            style: GoogleFonts.inter(),
-          ),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _enabled
+              ? '${S.of(context).t("reminder_enabled_at")} ${_time.format(context)}'
+              : S.of(context).t('reminder_disabled_msg'),
         ),
-      );
-      context.pop();
-    }
+      ),
+    );
+    context.pop();
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Nhắc nhở đọc sách',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-        ),
+      appBar: CustomAppBar(
+        title: S.of(context).t('reminder_title'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.all(20),
-                    children: [
-                      // Preview
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: _enabled 
-                                ? [AppColors.primaryStart, AppColors.primaryEnd]
-                                : [Colors.grey.shade400, Colors.grey.shade500],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Column(
+          : SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                      children: [
+                        _buildHeroCard(),
+                        const SizedBox(height: AppSpacing.xl),
+                        SettingsSectionCard(
+                          title: S.of(context).t('reminder_schedule'),
+                          subtitle:
+                              S.of(context).t('reminder_schedule_desc'),
                           children: [
-                            Icon(
-                              _enabled ? Icons.notifications_active : Icons.notifications_off,
-                              size: 48,
-                              color: Colors.white.withValues(alpha: 0.9),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              _enabled ? _time.format(context) : 'Đã tắt',
-                              style: GoogleFonts.inter(
-                                fontSize: 36,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
+                            SettingsSwitchTile(
+                              icon: Icons.notifications_active_outlined,
+                              title: S.of(context).t('reminder_enable'),
+                              subtitle:
+                                  S.of(context).t('reminder_enable_desc'),
+                              value: _enabled,
+                              onChanged: _updateEnabled,
                             ),
                             if (_enabled)
-                              Text(
-                                'mỗi ngày',
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  color: Colors.white.withValues(alpha: 0.9),
+                              SettingsTile(
+                                icon: Icons.schedule_rounded,
+                                title: S.of(context).t('reminder_time'),
+                                subtitle:
+                                    '${S.of(context).t('reminder_time')}: ${_time.format(context)}',
+                                onTap: _selectTime,
+                                trailing: _ReminderTimeChip(
+                                  label: _time.format(context),
                                 ),
                               ),
                           ],
                         ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Enable toggle
-                      Container(
-                        decoration: BoxDecoration(
-                          color: isDark ? AppColors.cardDark : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: isDark
-                              ? []
-                              : [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.05),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                        ),
-                        child: SwitchListTile(
-                          title: Text(
-                            'Bật nhắc nhở',
-                            style: GoogleFonts.inter(
-                              fontWeight: FontWeight.w500,
-                              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                            ),
-                          ),
-                          subtitle: Text(
-                            'Nhận thông báo nhắc đọc sách mỗi ngày',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                            ),
-                          ),
-                          value: _enabled,
-                          onChanged: _updateEnabled,
-                          activeTrackColor: AppColors.primaryStart,
-                        ),
-                      ),
-
-                      if (_enabled) ...[
-                        const SizedBox(height: 16),
-
-                        // Time picker
-                        Container(
-                          decoration: BoxDecoration(
-                            color: isDark ? AppColors.cardDark : Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: isDark
-                                ? []
-                                : [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.05),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                          ),
-                          child: ListTile(
-                            onTap: _selectTime,
-                            leading: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: AppColors.primaryStart.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Icon(Icons.access_time, color: AppColors.primaryStart, size: 20),
-                            ),
-                            title: Text(
-                              'Thời gian',
-                              style: GoogleFonts.inter(
-                                fontWeight: FontWeight.w500,
-                                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                              ),
-                            ),
-                            trailing: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: AppColors.primaryStart.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                _time.format(context),
-                                style: GoogleFonts.inter(
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.primaryStart,
+                        if (_enabled) ...[
+                          const SizedBox(height: AppSpacing.xl),
+                          ModernCard(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SectionHeader(
+                                  title: S.of(context).t('reminder_suggest'),
+                                  subtitle:
+                                      S.of(context).t('reminder_suggest_desc'),
                                 ),
-                              ),
+                                const SizedBox(height: AppSpacing.lg),
+                                Wrap(
+                                  spacing: AppSpacing.sm,
+                                  runSpacing: AppSpacing.sm,
+                                  children:
+                                      [
+                                        {
+                                          'label': S.of(context).t('reminder_morning'),
+                                          'hour': 6,
+                                          'minute': 30,
+                                        },
+                                        {
+                                          'label': S.of(context).t('reminder_noon'),
+                                          'hour': 12,
+                                          'minute': 0,
+                                        },
+                                        {
+                                          'label': S.of(context).t('reminder_evening'),
+                                          'hour': 20,
+                                          'minute': 0,
+                                        },
+                                        {
+                                          'label': S.of(context).t('reminder_night'),
+                                          'hour': 22,
+                                          'minute': 0,
+                                        },
+                                      ].map((option) {
+                                        final selected =
+                                            _time.hour == option['hour'] &&
+                                            _time.minute == option['minute'];
+                                        return ChoiceChip(
+                                          label: Text('${option['label']}'),
+                                          selected: selected,
+                                          selectedColor: AppColors.primarySoft,
+                                          onSelected: (_) async {
+                                            final newTime = TimeOfDay(
+                                              hour: option['hour']! as int,
+                                              minute: option['minute']! as int,
+                                            );
+                                            setState(() => _time = newTime);
+                                            await _settingsService
+                                                .setReadingReminderTime(
+                                                  newTime.hour,
+                                                  newTime.minute,
+                                                );
+                                          },
+                                          labelStyle: Theme.of(context)
+                                              .textTheme
+                                              .labelLarge
+                                              ?.copyWith(
+                                                color: selected
+                                                    ? AppColors.primary
+                                                    : null,
+                                              ),
+                                        );
+                                      }).toList(),
+                                ),
+                              ],
                             ),
                           ),
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        // Quick time options
-                        Text(
-                          'Gợi ý thời gian',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: [
-                            {'label': 'Sáng sớm', 'hour': 6, 'minute': 30},
-                            {'label': 'Trưa', 'hour': 12, 'minute': 0},
-                            {'label': 'Chiều', 'hour': 17, 'minute': 0},
-                            {'label': 'Tối', 'hour': 20, 'minute': 0},
-                            {'label': 'Đêm khuya', 'hour': 22, 'minute': 0},
-                          ].map((option) {
-                            final isSelected = _time.hour == option['hour'] && _time.minute == option['minute'];
-                            return GestureDetector(
-                              onTap: () async {
-                                final newTime = TimeOfDay(hour: option['hour'] as int, minute: option['minute'] as int);
-                                setState(() => _time = newTime);
-                                await _settingsService.setReadingReminderTime(newTime.hour, newTime.minute);
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: isSelected ? AppColors.primaryStart : (isDark ? AppColors.cardDark : Colors.white),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isSelected ? AppColors.primaryStart : (isDark ? Colors.grey.shade700 : Colors.grey.shade300),
-                                  ),
-                                ),
-                                child: Text(
-                                  option['label'] as String,
-                                  style: GoogleFonts.inter(
-                                    fontWeight: FontWeight.w500,
-                                    color: isSelected ? Colors.white : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
+                        ],
                       ],
-                    ],
-                  ),
-                ),
-
-                // Save button
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: _save,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryStart,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        'Lưu cài đặt',
-                        style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
                     ),
                   ),
-                ),
-              ],
+                  SafeArea(
+                    top: false,
+                    minimum: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                    child: PrimaryButton(
+                      label: S.of(context).t('fc_settings_save'),
+                      icon: const Icon(
+                        Icons.check_circle_outline_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      onPressed: _save,
+                    ),
+                  ),
+                ],
+              ),
             ),
+    );
+  }
+
+  Widget _buildHeroCard() {
+    final colors = _enabled
+        ? AppGradients.warmHero.colors
+        : const [Color(0xFFE5E7EB), Color(0xFFD1D5DB)];
+
+    return ModernCard(
+      gradient: LinearGradient(colors: colors),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          Container(
+            width: 76,
+            height: 76,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.88),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              _enabled
+                  ? Icons.notifications_active_rounded
+                  : Icons.notifications_off_rounded,
+              color: _enabled ? AppColors.primary : AppColors.textSecondary,
+              size: 38,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            _enabled ? _time.format(context) : S.of(context).t('reminder_off'),
+            style: Theme.of(context).textTheme.displayMedium,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            _enabled ? S.of(context).t('reminder_daily') : S.of(context).t('reminder_none'),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReminderTimeChip extends StatelessWidget {
+  final String label;
+
+  const _ReminderTimeChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.primarySoft,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(
+          context,
+        ).textTheme.labelLarge?.copyWith(color: AppColors.primary),
+      ),
     );
   }
 }

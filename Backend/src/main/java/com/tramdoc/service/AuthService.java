@@ -98,7 +98,7 @@ public class AuthService {
     }
 
     public AuthResponse refreshToken(String refreshToken) {
-        if (!tokenProvider.validateToken(refreshToken)) {
+        if (!tokenProvider.validateRefreshToken(refreshToken)) {
             throw new BadRequestException("Refresh token không hợp lệ");
         }
 

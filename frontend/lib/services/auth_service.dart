@@ -2,6 +2,7 @@
 library;
 
 import 'package:google_sign_in/google_sign_in.dart';
+import '../exceptions/app_exception.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import '../services/api_service.dart';
 import '../config/api_config.dart';
@@ -10,15 +11,11 @@ import 'package:dio/dio.dart';
 
 class AuthService {
   final ApiService _apiService;
-  
-  // Google Sign-In configuration
-  // Web Client ID from Google Cloud Console
-  static const String _googleWebClientId = 
-      '844562415563-8lketaadahovtrhfa14pkirq6gs6v2nv.apps.googleusercontent.com';
-  
+
+  // Android reads Google Sign-In config from google-services.json.
+  // Web uses the client ID declared in web/index.html.
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
-    serverClientId: _googleWebClientId,
   );
   
   AuthService({ApiService? apiService}) 
@@ -35,20 +32,9 @@ class AuthService {
         },
       );
       
-      if (response.statusCode == 200 && response.data != null) {
-        final data = response.data as Map<String, dynamic>;
-        
-        // Save token
-        final token = data['token'] ?? data['accessToken'];
-        if (token != null) {
-          await _apiService.saveToken(token);
-        }
-        
-        // Parse user
-        final userData = data['user'] ?? data;
-        return User.fromJson(userData);
-      }
-      return null;
+      return await _handleAuthResponse(response);
+    } on AppException {
+      rethrow;
     } on DioException catch (e) {
       if (e.response?.data != null && e.response!.data is Map) {
         final data = e.response!.data as Map;
@@ -92,20 +78,9 @@ class AuthService {
         data: {'accessToken': accessToken},
       );
       
-      if (response.statusCode == 200 && response.data != null) {
-        final data = response.data as Map<String, dynamic>;
-        
-        // Save token
-        final token = data['token'] ?? data['accessToken'];
-        if (token != null) {
-          await _apiService.saveToken(token);
-        }
-        
-        // Parse user
-        final userData = data['user'] ?? data;
-        return User.fromJson(userData);
-      }
-      return null;
+      return await _handleAuthResponse(response);
+    } on AppException {
+      rethrow;
     } on DioException catch (e) {
       if (e.response?.data != null && e.response!.data is Map) {
         final data = e.response!.data as Map;
@@ -128,13 +103,19 @@ class AuthService {
       // Trigger Facebook Login
       final LoginResult result = await FacebookAuth.instance.login(
         permissions: ['email', 'public_profile'],
+        loginBehavior: LoginBehavior.nativeWithFallback,
       );
       
       if (result.status != LoginStatus.success) {
         if (result.status == LoginStatus.cancelled) {
           return null; // User cancelled
         }
-        throw Exception(result.message ?? 'Facebook login failed');
+        if (result.status == LoginStatus.operationInProgress) {
+          throw Exception('Đăng nhập Facebook đang được xử lý, vui lòng thử lại.');
+        }
+        throw Exception(
+          result.message ?? 'Đăng nhập Facebook thất bại. Hãy kiểm tra cấu hình app trên Meta Developers.',
+        );
       }
       
       final accessToken = result.accessToken?.tokenString;
@@ -149,20 +130,9 @@ class AuthService {
         data: {'accessToken': accessToken},
       );
       
-      if (response.statusCode == 200 && response.data != null) {
-        final data = response.data as Map<String, dynamic>;
-        
-        // Save token
-        final token = data['token'] ?? data['accessToken'];
-        if (token != null) {
-          await _apiService.saveToken(token);
-        }
-        
-        // Parse user
-        final userData = data['user'] ?? data;
-        return User.fromJson(userData);
-      }
-      return null;
+      return await _handleAuthResponse(response);
+    } on AppException {
+      rethrow;
     } on DioException catch (e) {
       if (e.response?.data != null && e.response!.data is Map) {
         final data = e.response!.data as Map;
@@ -192,20 +162,9 @@ class AuthService {
         },
       );
       
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = response.data as Map<String, dynamic>;
-        
-        // Save token if returned
-        final token = data['token'] ?? data['accessToken'];
-        if (token != null) {
-          await _apiService.saveToken(token);
-        }
-        
-        // Parse user
-        final userData = data['user'] ?? data;
-        return User.fromJson(userData);
-      }
-      return null;
+      return await _handleAuthResponse(response);
+    } on AppException {
+      rethrow;
     } catch (e) {
       rethrow;
     }
@@ -220,6 +179,8 @@ class AuthService {
         return User.fromJson(response.data as Map<String, dynamic>);
       }
       return null;
+    } on AppException {
+      rethrow;
     } catch (e) {
       return null;
     }
@@ -238,7 +199,7 @@ class AuthService {
       if (avatarUrl != null) data['avatarUrl'] = avatarUrl;
       
       final response = await _apiService.put(
-        ApiConfig.userMe,
+        ApiConfig.userProfile,
         data: data,
       );
       
@@ -246,6 +207,8 @@ class AuthService {
         return User.fromJson(response.data as Map<String, dynamic>);
       }
       return null;
+    } on AppException {
+      rethrow;
     } catch (e) {
       return null;
     }
@@ -256,14 +219,40 @@ class AuthService {
     // Sign out from Google if signed in
     try {
       await _googleSignIn.signOut();
+    } on AppException {
+      rethrow;
     } catch (_) {}
     
     // Sign out from Facebook if signed in
     try {
       await FacebookAuth.instance.logOut();
+    } on AppException {
+      rethrow;
     } catch (_) {}
     
     await _apiService.clearTokens();
+  }
+  
+  /// Helper method to extract token and user from auth responses
+  Future<User?> _handleAuthResponse(Response response) async {
+    if ((response.statusCode == 200 || response.statusCode == 201) && response.data != null) {
+      final data = response.data as Map<String, dynamic>;
+      
+      // Save tokens
+      final token = data['token'] ?? data['accessToken'];
+      if (token != null) {
+        await _apiService.saveToken(token);
+      }
+      final refreshToken = data['refreshToken'];
+      if (refreshToken != null) {
+        await _apiService.saveRefreshToken(refreshToken);
+      }
+      
+      // Parse user
+      final userData = data['user'] ?? data;
+      return User.fromJson(userData);
+    }
+    return null;
   }
 }
 

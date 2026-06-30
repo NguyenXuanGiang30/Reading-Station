@@ -1,79 +1,94 @@
-/// Flashcard Service - API calls for flashcard management with SM-2 algorithm
+/// Flashcard Service - API calls aligned with backend controllers
 library;
 
 import '../models/flashcard.dart';
 import 'api_service.dart';
+import '../exceptions/app_exception.dart';
 
 class FlashcardService {
   final ApiService _api = ApiService();
-  
-  /// Get all flashcard decks
+
   Future<List<FlashcardDeck>> getDecks() async {
     try {
       final response = await _api.get('/flashcards/decks');
-      
       if (response.data != null) {
         final list = response.data as List;
-        return list.map((json) => FlashcardDeck.fromJson(json)).toList();
+        return list
+            .map((json) => FlashcardDeck.fromJson(json as Map<String, dynamic>))
+            .toList();
       }
       return [];
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể tải bộ flashcard: $e');
+      throw Exception('Khong the tai bo flashcard: $e');
     }
   }
-  
-  /// Get deck by ID
+
   Future<FlashcardDeck?> getDeckById(String id) async {
     try {
-      final response = await _api.get('/flashcards/decks/$id');
-      if (response.data != null) {
-        return FlashcardDeck.fromJson(response.data);
+      final decks = await getDecks();
+      for (final deck in decks) {
+        if (deck.userBookId == id) return deck;
       }
       return null;
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể tải thông tin bộ flashcard: $e');
+      throw Exception('Khong the tai thong tin bo flashcard: $e');
     }
   }
-  
-  /// Get flashcards due for review
+
   Future<List<Flashcard>> getDueCards({String? deckId, int limit = 20}) async {
     try {
-      final queryParams = <String, dynamic>{'limit': limit};
-      if (deckId != null) {
-        queryParams['deckId'] = deckId;
+      final response = await _api.get('/flashcards/due');
+      if (response.data == null) return [];
+
+      Iterable<dynamic> items = response.data as List;
+      if (deckId != null && deckId.isNotEmpty) {
+        items = items.where((json) {
+          final map = json as Map<String, dynamic>;
+          final cardDeckId = map['userBookId']?.toString() ??
+              map['user_book_id']?.toString() ??
+              map['bookId']?.toString() ??
+              map['book_id']?.toString();
+          return cardDeckId == deckId;
+        });
       }
-      
-      final response = await _api.get(
-        '/flashcards/due',
-        queryParameters: queryParams,
-      );
-      
-      if (response.data != null) {
-        final list = response.data as List;
-        return list.map((json) => Flashcard.fromJson(json)).toList();
-      }
-      return [];
+
+      return items
+          .take(limit)
+          .map((json) => Flashcard.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể tải flashcard cần ôn: $e');
+      throw Exception('Khong the tai flashcard can on: $e');
     }
   }
-  
-  /// Get all flashcards in a deck
+
   Future<List<Flashcard>> getCardsByDeck(String deckId) async {
     try {
-      final response = await _api.get('/flashcards/decks/$deckId/cards');
-      
+      final response = await _api.get('/flashcards', queryParameters: {
+        'bookId': deckId,
+        'page': 0,
+        'size': 100,
+      });
+
       if (response.data != null) {
-        final list = response.data as List;
-        return list.map((json) => Flashcard.fromJson(json)).toList();
+        final list = response.data['content'] as List? ?? const [];
+        return list
+            .map((json) => Flashcard.fromJson(json as Map<String, dynamic>))
+            .toList();
       }
       return [];
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể tải flashcard: $e');
+      throw Exception('Khong the tai flashcard: $e');
     }
   }
-  
-  /// Create a new flashcard
+
   Future<Flashcard?> createCard({
     required String deckId,
     required String front,
@@ -82,125 +97,123 @@ class FlashcardService {
   }) async {
     try {
       final response = await _api.post('/flashcards', data: {
-        'deckId': deckId,
-        'front': front,
-        'back': back,
-        'noteId': noteId,
+        'bookId': int.tryParse(deckId),
+        'question': front,
+        'answer': back,
       });
-      
+
       if (response.data != null) {
-        return Flashcard.fromJson(response.data);
+        return Flashcard.fromJson(response.data as Map<String, dynamic>);
       }
       return null;
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể tạo flashcard: $e');
+      throw Exception('Khong the tao flashcard: $e');
     }
   }
 
-  /// Create a flashcard from a note
   Future<Flashcard?> createCardFromNote(String noteId) async {
     try {
       final response = await _api.post('/flashcards/from-note/$noteId');
-      
       if (response.data != null) {
-        return Flashcard.fromJson(response.data);
+        return Flashcard.fromJson(response.data as Map<String, dynamic>);
       }
       return null;
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể tạo flashcard từ ghi chú: $e');
+      throw Exception('Khong the tao flashcard tu ghi chu: $e');
     }
   }
-  
-  /// Update flashcard
-  Future<Flashcard?> updateCard(String id, {
-    String? front,
-    String? back,
-  }) async {
+
+  Future<Flashcard?> updateCard(String id, {String? front, String? back}) async {
     try {
       final data = <String, dynamic>{};
-      if (front != null) data['front'] = front;
-      if (back != null) data['back'] = back;
+      if (front != null) data['question'] = front;
+      if (back != null) data['answer'] = back;
       
       final response = await _api.put('/flashcards/$id', data: data);
       if (response.data != null) {
-        return Flashcard.fromJson(response.data);
+        return Flashcard.fromJson(response.data as Map<String, dynamic>);
       }
       return null;
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể cập nhật flashcard: $e');
+      throw Exception('Khong the cap nhat flashcard: $e');
     }
   }
-  
-  /// Delete flashcard
+
   Future<bool> deleteCard(String id) async {
     try {
       await _api.delete('/flashcards/$id');
       return true;
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể xóa flashcard: $e');
+      throw Exception('Khong the xoa flashcard: $e');
     }
   }
-  
-  /// Submit review result (SM-2 algorithm)
-  /// quality: 0 (Again), 1 (Hard), 2 (Good), 3 (Easy)
+
   Future<Flashcard?> submitReview(String cardId, int quality) async {
     try {
       final response = await _api.post('/flashcards/$cardId/review', data: {
-        'quality': quality,
+        'result': _mapQualityToResult(quality),
       });
-      
+
       if (response.data != null) {
-        return Flashcard.fromJson(response.data);
+        return Flashcard.fromJson(response.data as Map<String, dynamic>);
       }
       return null;
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể lưu kết quả: $e');
+      throw Exception('Khong the luu ket qua: $e');
     }
   }
-  
-  /// Get review statistics
+
   Future<Map<String, dynamic>> getStatistics() async {
     try {
-      final response = await _api.get('/flashcards/statistics');
-      return response.data ?? {};
+      final response = await _api.get('/flashcards/stats');
+      final data = response.data as Map<String, dynamic>? ?? {};
+      return {
+        ...data,
+        'streak': 0,
+      };
+    } on AppException {
+      rethrow;
     } catch (e) {
       return {};
     }
   }
-  
-  /// Get today's review summary
+
   Future<Map<String, dynamic>> getTodaySummary() async {
     try {
-      final response = await _api.get('/flashcards/today');
-      return response.data ?? {
+      final stats = await getStatistics();
+      return {
         'reviewed': 0,
-        'due': 0,
+        'due': stats['dueCards'] ?? 0,
         'new': 0,
       };
-    } catch (e) {
+    } on AppException {
+      rethrow;
+    } catch (_) {
       return {'reviewed': 0, 'due': 0, 'new': 0};
     }
   }
-  
-  /// Create a new deck
+
   Future<FlashcardDeck?> createDeck({
     required String name,
     required String bookId,
     String? description,
   }) async {
-    try {
-      final response = await _api.post('/flashcards/decks', data: {
-        'name': name,
-        'bookId': bookId,
-        'description': description,
-      });
-      
-      if (response.data != null) {
-        return FlashcardDeck.fromJson(response.data);
-      }
-      return null;
-    } catch (e) {
-      throw Exception('Không thể tạo bộ flashcard: $e');
-    }
+    throw Exception('Backend hien chua ho tro tao deck rieng.');
+  }
+
+  String _mapQualityToResult(int quality) {
+    if (quality <= 0) return 'FORGOT';
+    if (quality == 1) return 'REMEMBERED';
+    return 'MASTERED';
   }
 }

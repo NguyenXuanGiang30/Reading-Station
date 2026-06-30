@@ -1,22 +1,33 @@
-/// AddEditBookScreen - Form thêm/sửa sách
+﻿/// AddEditBookScreen - Form them/sua sach
 library;
 
-import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
-
-import '../../theme/colors.dart';
-import '../../models/book.dart';
-import '../../services/user_book_service.dart';
-import '../../services/book_service.dart';
 import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+
+import '../../constants/app_constants.dart' show AppConstants;
+import '../../models/book.dart';
+import '../../services/book_service.dart';
+import '../../services/user_book_service.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_gradients.dart';
+import '../../theme/app_radius.dart';
+import '../../theme/app_spacing.dart';
+import '../../utils/validators.dart';
+import '../../widgets/common/custom_app_bar.dart';
+import '../../widgets/common/custom_text_field.dart';
+import '../../widgets/common/modern_card.dart';
+import '../../widgets/common/primary_button.dart';
+import '../../widgets/common/section_header.dart';
+import '../../l10n/app_localizations.dart';
 
 class AddEditBookScreen extends StatefulWidget {
   final String? bookId;
   final String? isbn;
-  
+
   const AddEditBookScreen({super.key, this.bookId, this.isbn});
 
   @override
@@ -24,34 +35,34 @@ class AddEditBookScreen extends StatefulWidget {
 }
 
 class _AddEditBookScreenState extends State<AddEditBookScreen> {
-  final _userBookService = UserBookService();
-  final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _authorController = TextEditingController();
-  final _isbnController = TextEditingController();
-  final _publisherController = TextEditingController();
-  final _pagesController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _locationController = TextEditingController();
-  
+  final UserBookService _userBookService = UserBookService();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _authorController = TextEditingController();
+  final TextEditingController _isbnController = TextEditingController();
+  final TextEditingController _publisherController = TextEditingController();
+  final TextEditingController _pagesController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _locationController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
+
   ReadingStatus _status = ReadingStatus.wantToRead;
   String? _category;
   String? _coverUrl;
   File? _selectedImage;
-  final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
-  
+
   bool get isEditing => widget.bookId != null;
-  
-  final List<String> _categories = [
-    'Tự phát triển',
-    'Kinh doanh',
-    'Tâm lý',
-    'Tiểu thuyết',
-    'Khoa học',
-    'Lịch sử',
-    'Triết học',
-    'Khác',
+
+  List<String> get _categories => [
+    S.of(context).t('book_cat_self'),
+    S.of(context).t('book_cat_business'),
+    S.of(context).t('book_cat_psychology'),
+    S.of(context).t('book_cat_novel'),
+    S.of(context).t('book_cat_science'),
+    S.of(context).t('book_cat_history'),
+    S.of(context).t('book_cat_philosophy'),
+    S.of(context).t('book_cat_other'),
   ];
 
   @override
@@ -63,89 +74,6 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
     }
     if (isEditing) {
       _loadBook();
-    }
-  }
-
-  Future<void> _loadBook() async {
-    if (widget.bookId == null) return;
-    
-    try {
-      setState(() => _isLoading = true);
-      // Fetch user book details
-      final data = await _userBookService.getUserBookById(widget.bookId!);
-      
-      if (data != null && data['book'] != null) {
-        final book = data['book'];
-        _titleController.text = book['title'] ?? '';
-        _authorController.text = book['author'] ?? '';
-        _isbnController.text = book['isbn'] ?? '';
-        _publisherController.text = book['publisher'] ?? '';
-        _pagesController.text = (data['currentPage'] ?? book['totalPages'] ?? 0).toString(); // Using currentPage as progress proxy if needed, or totalPages
-        // Corrections: _pagesController typically is total pages of book.
-        // Let's assume user wants to edit book info.
-        _pagesController.text = (book['totalPages'] ?? 0).toString();
-        
-        _descriptionController.text = book['description'] ?? '';
-        _locationController.text = data['location'] ?? ''; // location is in UserBook
-        
-        // Status parsing
-        try {
-            final statusStr = data['status'] as String?;
-            if (statusStr != null) {
-                // Find enum by value or name
-                _status = ReadingStatus.values.firstWhere(
-                  (e) => e.value == statusStr || e.name.toUpperCase() == statusStr,
-                  orElse: () => ReadingStatus.wantToRead,
-                );
-            }
-        } catch (_) {}
-        
-        _category = book['category'];
-        if (!_categories.contains(_category)) {
-           _category = null; // or add to list dynamically
-        }
-        
-        _coverUrl = book['coverUrl'];
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi tải sách: $e'), backgroundColor: AppColors.error),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _fetchBookInfo(String isbn) async {
-    setState(() => _isLoading = true);
-    
-    try {
-      final bookService = BookService();
-      final bookData = await bookService.getBookByIsbn(isbn);
-      
-      if (bookData != null && mounted) {
-        setState(() {
-          _titleController.text = bookData['title'] ?? '';
-          _authorController.text = bookData['author'] ?? '';
-          _publisherController.text = bookData['publisher'] ?? '';
-          _descriptionController.text = bookData['description'] ?? '';
-          if (bookData['totalPages'] != null && bookData['totalPages'] > 0) {
-            _pagesController.text = bookData['totalPages'].toString();
-          }
-          if (bookData['category'] != null && _categories.contains(bookData['category'])) {
-            _category = bookData['category'];
-          }
-          if (bookData['coverUrl'] != null) {
-            _coverUrl = bookData['coverUrl'];
-          }
-        });
-      }
-    } catch (e) {
-      // Silently fail - user can still enter manually
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -161,83 +89,168 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
     super.dispose();
   }
 
+  Future<void> _loadBook() async {
+    if (widget.bookId == null) return;
+
+    try {
+      setState(() => _isLoading = true);
+      final data = await _userBookService.getUserBookById(widget.bookId!);
+
+      if (data != null && data['book'] != null) {
+        final book = data['book'];
+        _titleController.text = book['title'] ?? '';
+        _authorController.text = book['author'] ?? '';
+        _isbnController.text = book['isbn'] ?? '';
+        _publisherController.text = book['publisher'] ?? '';
+        _pagesController.text = (book['totalPages'] ?? 0).toString();
+        _descriptionController.text = book['description'] ?? '';
+        _locationController.text = data['location'] ?? '';
+        _category = book['category'];
+        if (!_categories.contains(_category)) {
+          _category = null;
+        }
+        _coverUrl = book['coverUrl'];
+
+        final statusStr = data['status'] as String?;
+        if (statusStr != null) {
+          _status = ReadingStatus.values.firstWhere(
+            (element) =>
+                element.value == statusStr ||
+                element.name.toUpperCase() == statusStr,
+            orElse: () => ReadingStatus.wantToRead,
+          );
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${S.of(context).t('book_load_err')}: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _fetchBookInfo(String isbn) async {
+    setState(() => _isLoading = true);
+
+    try {
+      final bookService = BookService();
+      final bookData = await bookService.getBookByIsbn(isbn);
+
+      if (bookData != null && mounted) {
+        setState(() {
+          _titleController.text = bookData['title'] ?? '';
+          _authorController.text = bookData['author'] ?? '';
+          _publisherController.text = bookData['publisher'] ?? '';
+          _descriptionController.text = bookData['description'] ?? '';
+          if (bookData['totalPages'] != null && bookData['totalPages'] > 0) {
+            _pagesController.text = '${bookData['totalPages']}';
+          }
+          if (bookData['category'] != null &&
+              _categories.contains(bookData['category'])) {
+            _category = bookData['category'];
+          }
+          if (bookData['coverUrl'] != null) {
+            _coverUrl = bookData['coverUrl'];
+          }
+        });
+      }
+    } catch (_) {
+      // Keep manual input available even if ISBN lookup fails.
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _pickImage() async {
     try {
-      final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
       if (pickedFile != null) {
         setState(() {
           _selectedImage = File(pickedFile.path);
         });
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi chọn ảnh: $e'), backgroundColor: AppColors.error),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${S.of(context).t('book_pick_err')}: $e')));
     }
   }
 
   Future<void> _saveBook() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
       if (isEditing) {
         await _userBookService.updateUserBook(
           userBookId: widget.bookId!,
-          title: _titleController.text,
-          author: _authorController.text,
+          title: _titleController.text.trim(),
+          author: _authorController.text.trim(),
           status: _status,
           category: _category,
-          description: _descriptionController.text.isNotEmpty ? _descriptionController.text : null,
-          location: _locationController.text.isNotEmpty ? _locationController.text : null,
-          totalPages: int.tryParse(_pagesController.text),
+          description:
+              _descriptionController.text.trim().isNotEmpty
+                  ? _descriptionController.text.trim()
+                  : null,
+          location:
+              _locationController.text.trim().isNotEmpty
+                  ? _locationController.text.trim()
+                  : null,
+          totalPages: int.tryParse(_pagesController.text.trim()),
         );
       } else {
         await _userBookService.addUserBook(
-          title: _titleController.text,
-          author: _authorController.text,
+          title: _titleController.text.trim(),
+          author: _authorController.text.trim(),
           status: _status,
-          isbn: _isbnController.text.isNotEmpty ? _isbnController.text : null,
-          publisher: _publisherController.text.isNotEmpty ? _publisherController.text : null,
+          isbn:
+              _isbnController.text.trim().isNotEmpty
+                  ? _isbnController.text.trim()
+                  : null,
+          publisher:
+              _publisherController.text.trim().isNotEmpty
+                  ? _publisherController.text.trim()
+                  : null,
           category: _category,
-          coverUrl: _coverUrl, // Pass coverUrl if available from API/ISBN
-          description: _descriptionController.text.isNotEmpty ? _descriptionController.text : null,
-          location: _locationController.text.isNotEmpty ? _locationController.text : null,
-          totalPages: int.tryParse(_pagesController.text),
+          coverUrl: _coverUrl,
+          description:
+              _descriptionController.text.trim().isNotEmpty
+                  ? _descriptionController.text.trim()
+                  : null,
+          location:
+              _locationController.text.trim().isNotEmpty
+                  ? _locationController.text.trim()
+                  : null,
+          totalPages: int.tryParse(_pagesController.text.trim()),
         );
       }
-      
-      // Warning if local image was selected but couldn't be uploaded
+
       if (_selectedImage != null && mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
-           const SnackBar(
-             content: Text('Lưu ý: Ảnh tải lên chưa được hỗ trợ, chỉ lưu thông tin sách'),
-             backgroundColor: Colors.orange,
-           ),
-         );
-      }
-      
-      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isEditing ? 'Đã cập nhật sách' : 'Đã thêm sách mới'),
-            backgroundColor: AppColors.success,
+            content: Text(
+              S.of(context).t('book_cover_local_note'),
+            ),
           ),
         );
-        context.pop(true); // Return true to refresh list
       }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isEditing ? S.of(context).t('book_updated') : S.of(context).t('book_added')),
+        ),
+      );
+      context.pop(true);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$e'.replaceAll('Exception: ', ''))),
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -245,364 +258,357 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          isEditing ? 'Chỉnh sửa sách' : 'Thêm sách mới',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-        ),
+      appBar: CustomAppBar(
+        title: isEditing ? S.of(context).t('book_edit_title') : S.of(context).t('book_add_title'),
         leading: IconButton(
-          icon: const Icon(Icons.close),
           onPressed: () => context.pop(),
+          icon: const Icon(Icons.close_rounded),
         ),
-        actions: [
-          TextButton(
-            onPressed: _isLoading ? null : _saveBook,
-            child: _isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(
-                    'Lưu',
-                    style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primaryStart,
-                    ),
-                  ),
-          ),
-        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: PrimaryButton(
+          label: isEditing ? S.of(context).t('book_update_btn') : S.of(context).t('book_save_btn'),
+          loading: _isLoading,
+          onPressed: _isLoading ? null : _saveBook,
+        ),
       ),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
           children: [
-            // Book cover placeholder
-            Center(
-              child: GestureDetector(
-                onTap: _pickImage,
-                  child: Stack(
-                    children: [
-                      Container(
-                        width: 120,
-                        height: 180,
-                        decoration: BoxDecoration(
-                          color: isDark ? AppColors.cardDark : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.grey.shade300,
-                            style: BorderStyle.solid,
-                          ),
-                          image: _selectedImage != null
-                              ? DecorationImage(
-                                  image: FileImage(_selectedImage!),
-                                  fit: BoxFit.cover,
-                                )
-                              : (_coverUrl != null && _coverUrl!.isNotEmpty
-                                  ? DecorationImage(
-                                      image: CachedNetworkImageProvider(_coverUrl!),
-                                      fit: BoxFit.cover,
-                                    )
-                                  : null),
-                        ),
-                        child: (_selectedImage == null && (_coverUrl == null || _coverUrl!.isEmpty))
-                            ? Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey.shade400),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Thêm ảnh bìa',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : null,
-                      ),
-                      if (_selectedImage != null || (_coverUrl != null && _coverUrl!.isNotEmpty))
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _selectedImage = null;
-                                _coverUrl = null;
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Colors.black54,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.close, color: Colors.white, size: 16),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            
-            const SizedBox(height: 24),
-            
-            // Title
-            _buildTextField(
-              controller: _titleController,
-              label: 'Tên sách *',
-              hint: 'Nhập tên sách',
-              validator: (v) => v?.isEmpty == true ? 'Vui lòng nhập tên sách' : null,
-              isDark: isDark,
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Author
-            _buildTextField(
-              controller: _authorController,
-              label: 'Tác giả *',
-              hint: 'Nhập tên tác giả',
-              validator: (v) => v?.isEmpty == true ? 'Vui lòng nhập tên tác giả' : null,
-              isDark: isDark,
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // ISBN
-            _buildTextField(
-              controller: _isbnController,
-              label: 'ISBN',
-              hint: 'Nhập mã ISBN',
-              keyboardType: TextInputType.number,
-              isDark: isDark,
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.qr_code_scanner),
-                onPressed: () => context.push('/scanner'),
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Category & Status row
-            Row(
-              children: [
-                Expanded(
-                  child: _buildDropdown(
-                    label: 'Thể loại',
-                    value: _category,
-                    items: _categories,
-                    onChanged: (v) => setState(() => _category = v),
-                    isDark: isDark,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildStatusDropdown(isDark),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Publisher & Pages row
-            Row(
-              children: [
-                Expanded(
-                  child: _buildTextField(
-                    controller: _publisherController,
-                    label: 'Nhà xuất bản',
-                    hint: 'NXB',
-                    isDark: isDark,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildTextField(
-                    controller: _pagesController,
-                    label: 'Số trang',
-                    hint: '0',
-                    keyboardType: TextInputType.number,
-                    isDark: isDark,
-                  ),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Location
-            _buildTextField(
-              controller: _locationController,
-              label: 'Vị trí sách',
-              hint: 'VD: Kệ sách phòng khách',
-              prefixIcon: const Icon(Icons.location_on_outlined),
-              isDark: isDark,
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Description
-            _buildTextField(
-              controller: _descriptionController,
-              label: 'Mô tả',
-              hint: 'Nhập mô tả sách...',
-              maxLines: 4,
-              isDark: isDark,
-            ),
-            
-            const SizedBox(height: 32),
-            
-            // Scan barcode hint
-            if (!isEditing)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.info.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
-                ),
+            _buildHeroCard(context),
+            const SizedBox(height: AppSpacing.xl),
+            _buildInfoSection(),
+            const SizedBox(height: AppSpacing.xl),
+            _buildMetaSection(),
+            const SizedBox(height: AppSpacing.xl),
+            _buildDescriptionSection(),
+            if (!isEditing) ...[
+              const SizedBox(height: AppSpacing.xl),
+              ModernCard(
                 child: Row(
                   children: [
-                    const Icon(Icons.lightbulb_outline, color: AppColors.info),
-                    const SizedBox(width: 12),
+                    const Icon(
+                      Icons.lightbulb_outline_rounded,
+                      color: AppColors.info,
+                    ),
+                    const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: Text(
-                        'Mẹo: Quét mã vạch để tự động điền thông tin sách',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: AppColors.info,
-                        ),
+                        S.of(context).t('book_isbn_tip'),
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
                   ],
                 ),
               ),
-            
-            const SizedBox(height: 40),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
+  Widget _buildHeroCard(BuildContext context) {
+    return ModernCard(
+      gradient: AppGradients.warmHero,
+      elevated: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(
+            title: isEditing ? S.of(context).t('book_edit_hero') : S.of(context).t('book_add_hero'),
+            subtitle:
+                isEditing
+                    ? S.of(context).t('book_edit_hero_desc')
+                    : S.of(context).t('book_add_hero_desc'),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Row(
+            children: [
+              _buildCoverPreview(),
+              const SizedBox(width: AppSpacing.xl),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _pickImage,
+                      icon: const Icon(Icons.add_photo_alternate_outlined),
+                      label: Text(S.of(context).t('book_pick_cover')),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    OutlinedButton.icon(
+                      onPressed: () => context.push('/scanner'),
+                      icon: const Icon(Icons.qr_code_scanner_rounded),
+                      label: Text(S.of(context).t('book_scan_barcode')),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    if (_coverUrl != null || _selectedImage != null)
+                      TextButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _selectedImage = null;
+                            _coverUrl = null;
+                          });
+                        },
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        label: Text(S.of(context).t('book_remove_cover')),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoSection() {
+    return ModernCard(
+      child: Column(
+        children: [
+          CustomTextField(
+            controller: _titleController,
+            label: S.of(context).t('book_field_title'),
+            hint: S.of(context).t('book_field_title_hint'),
+            textCapitalization: TextCapitalization.sentences,
+            validator: (value) {
+              final result = Validators.combine([
+                Validators.required(value, fieldName: S.of(context).t('book_field_title')),
+                Validators.maxLength(
+                  value,
+                  AppConstants.maxTitleLength,
+                  fieldName: S.of(context).t('book_field_title'),
+                ),
+              ]);
+              return result.isValid ? null : result.errorMessage;
+            },
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          CustomTextField(
+            controller: _authorController,
+            label: S.of(context).t('book_field_author'),
+            hint: S.of(context).t('book_field_author_hint'),
+            textCapitalization: TextCapitalization.words,
+            validator: (value) {
+              final result = Validators.combine([
+                Validators.required(value, fieldName: S.of(context).t('book_field_author')),
+                Validators.maxLength(value, 200, fieldName: S.of(context).t('book_field_author')),
+              ]);
+              return result.isValid ? null : result.errorMessage;
+            },
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            children: [
+              Expanded(
+                child: CustomTextField(
+                  controller: _isbnController,
+                  label: S.of(context).t('book_field_isbn'),
+                  hint: S.of(context).t('book_field_isbn_hint'),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9-]')),
+                  ],
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return null;
+                    final result = Validators.isbn(value);
+                    return result.isValid ? null : result.errorMessage;
+                  },
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              IconButton.filledTonal(
+                onPressed: () {
+                  final isbn = _isbnController.text.trim();
+                  if (isbn.isNotEmpty) {
+                    _fetchBookInfo(isbn);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(S.of(context).t('book_isbn_search_err'))),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.search_rounded),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetaSection() {
+    return ModernCard(
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _buildDropdownField<String>(
+                  label: S.of(context).t('book_field_category'),
+                  value: _category,
+                  hint: S.of(context).t('book_field_category_hint'),
+                  items: _categories,
+                  onChanged: (value) => setState(() => _category = value),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: _buildDropdownField<ReadingStatus>(
+                  label: S.of(context).t('book_field_status'),
+                  value: _status,
+                  hint: S.of(context).t('book_field_status_hint'),
+                  items: ReadingStatus.values,
+                  itemLabel: (value) => value.label,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _status = value);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            children: [
+              Expanded(
+                child: CustomTextField(
+                  controller: _publisherController,
+                  label: S.of(context).t('book_field_publisher'),
+                  hint: S.of(context).t('book_field_publisher_hint'),
+                  textCapitalization: TextCapitalization.words,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: CustomTextField(
+                  controller: _pagesController,
+                  label: S.of(context).t('book_field_pages'),
+                  hint: '0',
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          CustomTextField(
+            controller: _locationController,
+            label: S.of(context).t('book_field_location'),
+            hint: S.of(context).t('book_field_location_hint'),
+            prefix: const Icon(Icons.location_on_outlined),
+            textCapitalization: TextCapitalization.sentences,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDescriptionSection() {
+    return ModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(
+            title: S.of(context).t('book_desc_title'),
+            subtitle: S.of(context).t('book_desc_subtitle'),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          CustomTextField(
+            controller: _descriptionController,
+            label: S.of(context).t('book_desc_label'),
+            hint: S.of(context).t('book_desc_hint'),
+            maxLines: 5,
+            textCapitalization: TextCapitalization.sentences,
+            validator: (value) {
+              final result = Validators.maxLength(
+                value,
+                AppConstants.maxDescriptionLength,
+                fieldName: S.of(context).t('book_desc_title'),
+              );
+              return result.isValid ? null : result.errorMessage;
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCoverPreview() {
+    ImageProvider<Object>? imageProvider;
+    if (_selectedImage != null) {
+      imageProvider = FileImage(_selectedImage!);
+    } else if (_coverUrl != null && _coverUrl!.isNotEmpty) {
+      imageProvider = NetworkImage(_coverUrl!);
+    }
+
+    return GestureDetector(
+      onTap: _pickImage,
+      child: Container(
+        width: 120,
+        height: 176,
+        decoration: BoxDecoration(
+          gradient: AppColors.primaryGradient,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          image:
+              imageProvider != null
+                  ? DecorationImage(image: imageProvider, fit: BoxFit.cover)
+                  : null,
+        ),
+        child:
+            imageProvider == null
+                ? Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.auto_stories_rounded,
+                      color: Colors.white,
+                      size: 38,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      S.of(context).t('book_add_cover'),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                )
+                : null,
+      ),
+    );
+  }
+
+  Widget _buildDropdownField<T>({
     required String label,
+    required T? value,
     required String hint,
-    required bool isDark,
-    TextInputType keyboardType = TextInputType.text,
-    int maxLines = 1,
-    String? Function(String?)? validator,
-    Widget? prefixIcon,
-    Widget? suffixIcon,
+    required List<T> items,
+    required ValueChanged<T?> onChanged,
+    String Function(T value)? itemLabel,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          maxLines: maxLines,
-          validator: validator,
-          decoration: InputDecoration(
-            hintText: hint,
-            prefixIcon: prefixIcon,
-            suffixIcon: suffixIcon,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDropdown({
-    required String label,
-    required String? value,
-    required List<String> items,
-    required Function(String?) onChanged,
-    required bool isDark,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-          ),
-        ),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          value: value,
-          decoration: InputDecoration(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          ),
-          hint: const Text('Chọn'),
-          items: items.map((item) => DropdownMenuItem(
-            value: item,
-            child: Text(item),
-          )).toList(),
-          onChanged: onChanged,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatusDropdown(bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Trạng thái',
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-          ),
-        ),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<ReadingStatus>(
-          value: _status,
-          decoration: InputDecoration(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          ),
-          items: ReadingStatus.values.map((status) => DropdownMenuItem(
-            value: status,
-            child: Text(status.label),
-          )).toList(),
-          onChanged: (v) {
-            if (v != null) setState(() => _status = v);
-          },
-        ),
-      ],
+    return DropdownButtonFormField<T>(
+      initialValue: value,
+      decoration: InputDecoration(labelText: label),
+      hint: Text(hint),
+      items:
+          items
+              .map(
+                (item) => DropdownMenuItem<T>(
+                  value: item,
+                  child: Text(itemLabel != null ? itemLabel(item) : '$item'),
+                ),
+              )
+              .toList(),
+      onChanged: onChanged,
     );
   }
 }

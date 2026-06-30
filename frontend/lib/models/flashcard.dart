@@ -44,14 +44,17 @@ class Flashcard extends Equatable {
   factory Flashcard.fromJson(Map<String, dynamic> json) {
     return Flashcard(
       id: json['id']?.toString() ?? '',
-      userBookId: json['userBookId']?.toString() ?? json['user_book_id']?.toString(),
+      userBookId: json['userBookId']?.toString() ??
+          json['user_book_id']?.toString() ??
+          json['bookId']?.toString() ??
+          json['book_id']?.toString(),
       bookTitle: json['bookTitle'] ?? json['book_title'],
       noteId: json['noteId']?.toString() ?? json['note_id']?.toString(),
       question: json['question'] ?? json['front'] ?? '',
       answer: json['answer'] ?? json['back'] ?? '',
-      repetition: json['repetition'] ?? 0,
+      repetition: json['repetition'] ?? json['repetitions'] ?? 0,
       easeFactor: (json['easeFactor'] ?? json['ease_factor'] ?? 2.5).toDouble(),
-      interval: json['interval'] ?? 1,
+      interval: json['interval'] ?? json['intervalDays'] ?? 1,
       nextReviewDate: json['nextReviewDate'] != null 
           ? DateTime.tryParse(json['nextReviewDate']) 
           : (json['next_review_date'] != null 
@@ -155,12 +158,26 @@ class FlashcardDeck extends Equatable {
   
   factory FlashcardDeck.fromJson(Map<String, dynamic> json) {
     return FlashcardDeck(
-      userBookId: json['userBookId']?.toString() ?? json['user_book_id']?.toString() ?? '',
-      bookTitle: json['bookTitle'] ?? json['book_title'] ?? '',
-      coverUrl: json['coverUrl'] ?? json['cover_url'],
+      userBookId: json['userBookId']?.toString() ??
+          json['user_book_id']?.toString() ??
+          json['bookId']?.toString() ??
+          json['book_id']?.toString() ??
+          json['deckName']?.toString() ??
+          '',
+      bookTitle: json['bookTitle'] ??
+          json['book_title'] ??
+          json['deckName'] ??
+          '',
+      coverUrl: json['coverUrl'] ?? json['cover_url'] ?? json['bookCoverUrl'],
       totalCards: json['totalCards'] ?? json['total_cards'] ?? 0,
       dueCards: json['dueCards'] ?? json['due_cards'] ?? 0,
-      masteredCards: json['masteredCards'] ?? json['mastered_cards'] ?? 0,
+      masteredCards: json['masteredCards'] ??
+          json['mastered_cards'] ??
+          (() {
+            final total = json['totalCards'] ?? json['total_cards'] ?? 0;
+            final due = json['dueCards'] ?? json['due_cards'] ?? 0;
+            return total - due;
+          })(),
     );
   }
   

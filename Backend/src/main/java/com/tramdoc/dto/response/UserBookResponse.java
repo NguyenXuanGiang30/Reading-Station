@@ -26,6 +26,9 @@ public class UserBookResponse {
     private LocalDate completedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Long ownerId;
+    private String ownerName;
+    private String ownerAvatarUrl;
     
     // Calculated fields
     private Double progressPercentage;

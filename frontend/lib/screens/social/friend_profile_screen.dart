@@ -1,13 +1,20 @@
-/// FriendProfileScreen - Profile bạn bè with API Integration
+/// FriendProfileScreen - Profile ban doc
 library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../theme/colors.dart';
 import '../../services/friend_service.dart';
-import '../../services/user_service.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_gradients.dart';
+import '../../theme/app_spacing.dart';
+import '../../widgets/common/custom_app_bar.dart';
+import '../../widgets/common/modern_card.dart';
+import '../../widgets/common/primary_button.dart';
+import '../../widgets/common/section_header.dart';
+import '../../widgets/states/error_state_widget.dart';
+import '../../widgets/states/loading_widget.dart';
+import '../../l10n/app_localizations.dart';
 
 class FriendProfileScreen extends StatefulWidget {
   final String friendId;
@@ -20,7 +27,6 @@ class FriendProfileScreen extends StatefulWidget {
 
 class _FriendProfileScreenState extends State<FriendProfileScreen> {
   final FriendService _friendService = FriendService();
-  final UserService _userService = UserService();
 
   Map<String, dynamic>? _friend;
   List<Map<String, dynamic>> _recentBooks = [];
@@ -42,28 +48,27 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
 
     try {
       final results = await Future.wait([
-        _userService.getUserProfile(widget.friendId),
-        _userService.getUserStats(widget.friendId),
+        _friendService.getFriendProfile(widget.friendId),
+        _friendService.getFriendBooks(widget.friendId),
       ]);
 
-      final profile = results[0] as Map<String, dynamic>;
-      final stats = results[1] as Map<String, dynamic>;
+      final profile = results[0] as Map<String, dynamic>? ?? {};
+      final friendBooks = results[1] as List<Map<String, dynamic>>;
 
+      if (!mounted) return;
       setState(() {
         _friend = {
           ...profile,
-          'booksRead': stats['totalBooksRead'] ?? 0,
-          'flashcards': stats['totalFlashcards'] ?? 0,
-          'streak': stats['currentStreak'] ?? 0,
+          'booksRead': friendBooks.length,
+          'flashcards': 0,
+          'streak': 0,
         };
-        _recentBooks = (stats['recentBooks'] as List<dynamic>?)
-                ?.map((e) => e as Map<String, dynamic>)
-                .toList() ??
-            [];
-        _isFollowing = profile['isFollowing'] as bool? ?? false;
+        _recentBooks = friendBooks;
+        _isFollowing = profile['friendshipId'] != null;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -73,43 +78,33 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
 
   Future<void> _toggleFollow() async {
     try {
+      final friendshipId = _friend?['friendshipId']?.toString() ?? widget.friendId;
       if (_isFollowing) {
-        await _friendService.unfollowUser(widget.friendId);
+        await _friendService.unfollowUser(friendshipId);
       } else {
         await _friendService.sendFriendRequest(widget.friendId);
       }
+
+      if (!mounted) return;
       setState(() {
         _isFollowing = !_isFollowing;
       });
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new),
-            onPressed: () => context.pop(),
-          ),
-        ),
-        body: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(color: AppColors.primaryStart),
-              SizedBox(height: 16),
-              Text('Đang tải...'),
-            ],
+        body: SafeArea(
+          child: LoadingWidget(
+            fullScreen: true,
+            message: S.of(context).t('friend_loading'),
           ),
         ),
       );
@@ -117,99 +112,126 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
 
     if (_error != null || _friend == null) {
       return Scaffold(
-        appBar: AppBar(
+        appBar: CustomAppBar(
+          title: S.of(context).t('friend_profile'),
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new),
             onPressed: () => context.pop(),
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
           ),
         ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64, color: AppColors.error),
-              const SizedBox(height: 16),
-              Text(_error ?? 'Không tìm thấy người dùng'),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: _loadFriendProfile,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Thử lại'),
-              ),
-            ],
+        body: SafeArea(
+          child: ErrorStateWidget(
+            message: _error ?? S.of(context).t('friend_not_found'),
+            onRetry: _loadFriendProfile,
           ),
         ),
       );
     }
 
     final friend = _friend!;
+    final name = '${friend['fullName'] ?? friend['name'] ?? S.of(context).t("find_friend_user")}';
+    final avatarUrl = friend['avatarUrl'] as String?;
 
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: _loadFriendProfile,
-        color: AppColors.primaryStart,
         child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            // Header with avatar
-            SliverAppBar(
-              expandedHeight: 200,
-              pinned: true,
-              backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
-              leading: IconButton(
-                icon: Icon(Icons.arrow_back_ios_new,
-                    color: isDark ? Colors.white : AppColors.textPrimaryLight, 
-                    size: 18),
-                onPressed: () => context.pop(),
-              ),
-              actions: [
-                IconButton(
-                  icon: Icon(Icons.more_vert, 
-                    color: isDark ? Colors.white70 : AppColors.textSecondaryLight,
-                    size: 20),
-                  onPressed: () {
-                    // TODO: More options
-                  },
-                ),
-              ],
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  color: isDark ? AppColors.surfaceDark : Colors.white,
-                  child: SafeArea(
+            SliverToBoxAdapter(
+              child: Container(
+                decoration: const BoxDecoration(gradient: AppGradients.warmHero),
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 40),
-                        CircleAvatar(
-                          radius: 45,
-                          backgroundColor: AppColors.primaryStart.withValues(alpha: 0.1),
-                          backgroundImage: friend['avatarUrl'] != null
-                              ? NetworkImage(friend['avatarUrl'])
-                              : null,
-                          child: friend['avatarUrl'] == null
-                              ? Text(
-                                  (friend['displayName'] ?? friend['name'] ?? '?')
-                                      .toString()
-                                      .isNotEmpty
-                                      ? (friend['displayName'] ??
-                                              friend['name'] ??
-                                              '?')[0]
-                                          .toUpperCase()
-                                      : '?',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primaryStart,
-                                  ),
-                                )
-                              : null,
+                        Row(
+                          children: [
+                            IconButton(
+                              onPressed: () => context.pop(),
+                              icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              onPressed: _showMoreOptions,
+                              icon: const Icon(Icons.more_horiz_rounded),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          friend['displayName'] ?? friend['name'] ?? 'Người dùng',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                        const SizedBox(height: AppSpacing.lg),
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 44,
+                              backgroundColor: Colors.white.withValues(alpha: 0.88),
+                              backgroundImage:
+                                  avatarUrl != null && avatarUrl.isNotEmpty
+                                      ? NetworkImage(avatarUrl)
+                                      : null,
+                              child:
+                                  avatarUrl == null || avatarUrl.isEmpty
+                                      ? Text(
+                                        name.substring(0, 1).toUpperCase(),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .headlineLarge
+                                            ?.copyWith(color: AppColors.primary),
+                                      )
+                                      : null,
+                            ),
+                            const SizedBox(width: AppSpacing.xl),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: Theme.of(context).textTheme.headlineLarge,
+                                  ),
+                                  const SizedBox(height: AppSpacing.xs),
+                                  Text(
+                                    (friend['bio']?.toString().trim().isNotEmpty ?? false)
+                                        ? '${friend['bio']}'
+                                        : S.of(context).t('friend_default_bio'),
+                                    style: Theme.of(context).textTheme.bodyMedium,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        ModernCard(
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _FriendMetric(
+                                  value: '${friend['booksRead'] ?? 0}',
+                                  label: S.of(context).t('friend_books_read'),
+                                  icon: Icons.menu_book_rounded,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              Expanded(
+                                child: _FriendMetric(
+                                  value: '${friend['flashcards'] ?? 0}',
+                                  label: S.of(context).t('search_flashcards'),
+                                  icon: Icons.style_rounded,
+                                  color: AppColors.secondary,
+                                ),
+                              ),
+                              Expanded(
+                                child: _FriendMetric(
+                                  value: '${friend['streak'] ?? 0}',
+                                  label: S.of(context).t('friend_days_streak'),
+                                  icon: Icons.local_fire_department_rounded,
+                                  color: AppColors.warning,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -218,74 +240,86 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                 ),
               ),
             ),
-
-            // Content
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Bio
-                    if (friend['bio'] != null && friend['bio'].toString().isNotEmpty)
-                      Text(
-                        friend['bio'],
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-
-                    const SizedBox(height: 16),
-
-                    // Stats
-                    _buildStats(friend, isDark),
-
-                    const SizedBox(height: 16),
-
-                    // Action buttons
-                    _buildActionButtons(context),
-
-                    const SizedBox(height: 24),
-
-                    // Recent books
-                    if (_recentBooks.isNotEmpty) ...[
-                      Text(
-                        'Sách đã đọc gần đây',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: isDark
-                              ? AppColors.textPrimaryDark
-                              : AppColors.textPrimaryLight,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      ..._recentBooks.map((book) => _buildBookItem(book, isDark)),
-                    ],
-
-                    const SizedBox(height: 24),
-
-                    // Joined date
-                    if (friend['joinedDate'] != null)
-                      Center(
-                        child: Text(
-                          'Tham gia: ${friend['joinedDate']}',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  Row(
+                    children: [
+                      Expanded(
+                        child: PrimaryButton(
+                          label: _isFollowing ? S.of(context).t('friend_following') : S.of(context).t('friend_follow'),
+                          icon: Icon(
+                            _isFollowing
+                                ? Icons.person_remove_alt_1_rounded
+                                : Icons.person_add_alt_1_rounded,
+                            size: 18,
+                            color: Colors.white,
                           ),
+                          onPressed: _toggleFollow,
                         ),
                       ),
-
-                    const SizedBox(height: 40),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(S.of(context).t('friend_message_soon')),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.chat_bubble_outline_rounded),
+                          label: Text(S.of(context).t('friend_message')),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  if (_recentBooks.isNotEmpty) ...[
+                    SectionHeader(
+                      title: S.of(context).t('friend_recent_books'),
+                      subtitle: '${_recentBooks.length} ${S.of(context).t("friend_shared_desc")}',
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    ..._recentBooks.asMap().entries.map((entry) {
+                      final book = entry.value;
+                      return Padding(
+                        padding: EdgeInsets.only(
+                          bottom: entry.key == _recentBooks.length - 1
+                              ? 0
+                              : AppSpacing.md,
+                        ),
+                        child: _FriendBookCard(book: book),
+                      );
+                    }),
+                  ] else
+                    ModernCard(
+                      child: Column(
+                        children: [
+                          const Icon(
+                            Icons.menu_book_outlined,
+                            size: 42,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          Text(
+                            S.of(context).t('friend_no_books'),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (friend['createdAt'] != null) ...[
+                    const SizedBox(height: AppSpacing.xl),
+                    Center(
+                      child: Text(
+                        '${S.of(context).t("friend_joined")} ${friend['createdAt']}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
                   ],
-                ),
+                ]),
               ),
             ),
           ],
@@ -294,203 +328,218 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     );
   }
 
-  Widget _buildStats(Map<String, dynamic> friend, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: isDark
-            ? []
-            : [
-                BoxShadow(
-                  color: AppColors.shadowLight,
-                  blurRadius: 15,
-                  offset: const Offset(0, 6),
+  void _showMoreOptions() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder:
+          (bottomSheetContext) => Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _ProfileActionTile(
+                  icon: Icons.person_remove_alt_1_rounded,
+                  title: S.of(context).t('friend_unfriend'),
+                  color: AppColors.textPrimary,
+                  onTap: () async {
+                    Navigator.pop(bottomSheetContext);
+                    try {
+                      final friendshipId =
+                          _friend?['friendshipId']?.toString() ?? widget.friendId;
+                      await _friendService.removeFriend(friendshipId);
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(S.of(context).t('friend_unfriended'))),
+                      );
+                      context.pop();
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Loi: $e')),
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _ProfileActionTile(
+                  icon: Icons.block_rounded,
+                  title: S.of(context).t('friend_block'),
+                  color: AppColors.error,
+                  onTap: () {
+                    Navigator.pop(bottomSheetContext);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(S.of(context).t('friend_block_soon')),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _ProfileActionTile(
+                  icon: Icons.flag_rounded,
+                  title: S.of(context).t('friend_report'),
+                  color: AppColors.warning,
+                  onTap: () {
+                    Navigator.pop(bottomSheetContext);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(S.of(context).t('friend_report_soon')),
+                      ),
+                    );
+                  },
                 ),
               ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildStatItem(
-            value: '${friend['booksRead'] ?? 0}',
-            label: 'Sách đã đọc',
-            icon: Icons.menu_book,
-            color: AppColors.primaryStart,
-            isDark: isDark,
+            ),
           ),
-          _buildStatItem(
-            value: '${friend['flashcards'] ?? 0}',
-            label: 'Flashcard',
-            icon: Icons.style,
-            color: AppColors.success,
-            isDark: isDark,
-          ),
-          _buildStatItem(
-            value: '${friend['streak'] ?? 0}',
-            label: 'Ngày streak',
-            icon: Icons.local_fire_department,
-            color: AppColors.warning,
-            isDark: isDark,
-          ),
-        ],
-      ),
     );
   }
+}
 
-  Widget _buildStatItem({
-    required String value,
-    required String label,
-    required IconData icon,
-    required Color color,
-    required bool isDark,
-  }) {
+class _FriendMetric extends StatelessWidget {
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  const _FriendMetric({
+    required this.value,
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       children: [
-        Icon(icon, color: color, size: 24),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(14),
           ),
+          child: Icon(icon, color: color),
         ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(value, style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: AppSpacing.xs),
         Text(
           label,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 12,
-            color:
-                isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-          ),
+          style: Theme.of(context).textTheme.bodySmall,
+          textAlign: TextAlign.center,
         ),
       ],
     );
   }
+}
 
-  Widget _buildActionButtons(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: _toggleFollow,
-            icon: Icon(
-              _isFollowing ? Icons.person_remove : Icons.person_add,
-              color: _isFollowing ? AppColors.primaryStart : Colors.white,
-            ),
-            label: Text(
-              _isFollowing ? 'Đang theo dõi' : 'Theo dõi',
-              style: GoogleFonts.plusJakartaSans(
-                fontWeight: FontWeight.w600,
-                color: _isFollowing ? AppColors.primaryStart : Colors.white,
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor:
-                  _isFollowing ? Colors.white : AppColors.primaryStart,
-              side: _isFollowing
-                  ? const BorderSide(color: AppColors.primaryStart)
-                  : null,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () {
-              // TODO: Send message
-            },
-            icon: const Icon(Icons.chat_bubble_outline),
-            label: Text(
-              'Nhắn tin',
-              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
-            ),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          ),
-        ),
-      ],
+class _FriendBookCard extends StatelessWidget {
+  final Map<String, dynamic> book;
+
+  const _FriendBookCard({required this.book});
+
+  @override
+  Widget build(BuildContext context) {
+    final nestedBook = Map<String, dynamic>.from(
+      (book['book'] as Map?)?.cast<String, dynamic>() ?? const {},
     );
-  }
+    final coverUrl =
+        (nestedBook['coverUrl'] ?? nestedBook['coverImageUrl'] ?? book['coverUrl'])
+            as String?;
+    final title = nestedBook['title'] ?? book['title'] ?? S.of(context).t('friend_no_title');
+    final author =
+        nestedBook['author'] ?? book['author'] ?? S.of(context).t('friend_no_author');
 
-  Widget _buildBookItem(Map<String, dynamic> book, bool isDark) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: isDark
-            ? []
-            : [
-                BoxShadow(
-                  color: AppColors.shadowLight,
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-      ),
+    return ModernCard(
       child: Row(
         children: [
           Container(
-            width: 48,
-            height: 64,
+            width: 50,
+            height: 70,
             decoration: BoxDecoration(
               gradient: AppColors.primaryGradient,
-              borderRadius: BorderRadius.circular(10),
-              image: book['coverUrl'] != null
-                  ? DecorationImage(
-                      image: NetworkImage(book['coverUrl']),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
+              borderRadius: BorderRadius.circular(12),
+              image:
+                  coverUrl != null && coverUrl.isNotEmpty
+                      ? DecorationImage(
+                        image: NetworkImage(coverUrl),
+                        fit: BoxFit.cover,
+                      )
+                      : null,
             ),
-            child: book['coverUrl'] == null
-                ? const Icon(Icons.menu_book, color: Colors.white, size: 24)
-                : null,
+            child:
+                coverUrl == null || coverUrl.isEmpty
+                    ? const Icon(
+                      Icons.menu_book_rounded,
+                      color: Colors.white,
+                    )
+                    : null,
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: AppSpacing.lg),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  book['title'] ?? 'Không có tiêu đề',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontWeight: FontWeight.w600,
-                    color: isDark
-                        ? AppColors.textPrimaryDark
-                        : AppColors.textPrimaryLight,
-                  ),
+                  '$title',
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
-                  book['author'] ?? 'Không rõ tác giả',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
-                  ),
+                  '$author',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
           ),
-          const Icon(
-            Icons.check_circle,
-            color: AppColors.success,
-            size: 20,
+          const SizedBox(width: AppSpacing.md),
+          const Icon(Icons.check_circle_rounded, color: AppColors.success),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileActionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ProfileActionTile({
+    required this.icon,
+    required this.title,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ModernCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: color),
           ),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: color,
+              ),
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: color),
         ],
       ),
     );

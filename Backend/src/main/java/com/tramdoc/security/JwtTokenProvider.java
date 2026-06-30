@@ -11,6 +11,10 @@ import java.util.Date;
 
 @Component
 public class JwtTokenProvider {
+
+    private static final String TOKEN_TYPE_CLAIM = "type";
+    private static final String ACCESS_TOKEN_TYPE = "access";
+    private static final String REFRESH_TOKEN_TYPE = "refresh";
     
     @Value("${jwt.secret}")
     private String jwtSecret;
@@ -32,6 +36,7 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .setSubject(email)
                 .claim("userId", userId)
+                .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
@@ -45,39 +50,47 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .setSubject(email)
                 .claim("userId", userId)
-                .claim("type", "refresh")
+                .claim(TOKEN_TYPE_CLAIM, REFRESH_TOKEN_TYPE)
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
-    
-    public Long getUserIdFromToken(String token) {
-        Claims claims = Jwts.parserBuilder()
+
+    private Claims getClaims(String token) {
+        return Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
-        
+    }
+    
+    public Long getUserIdFromToken(String token) {
+        Claims claims = getClaims(token);
         return claims.get("userId", Long.class);
     }
     
     public String getEmailFromToken(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-        
+        Claims claims = getClaims(token);
         return claims.getSubject();
+    }
+
+    public boolean isRefreshToken(String token) {
+        try {
+            String tokenType = getClaims(token).get(TOKEN_TYPE_CLAIM, String.class);
+            return REFRESH_TOKEN_TYPE.equals(tokenType);
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    public boolean validateRefreshToken(String token) {
+        return validateToken(token) && isRefreshToken(token);
     }
     
     public boolean validateToken(String token) {
         try {
-            Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
-                .build()
-                .parseClaimsJws(token);
+            getClaims(token);
             return true;
         } catch (JwtException | IllegalArgumentException e) {
             return false;

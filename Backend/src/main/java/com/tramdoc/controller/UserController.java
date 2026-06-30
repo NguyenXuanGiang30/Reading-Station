@@ -11,6 +11,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/v1/users")
 public class UserController {
@@ -44,5 +46,11 @@ public class UserController {
     public ResponseEntity<UserResponse> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
         UserResponse user = userService.updateProfile(request);
         return ResponseEntity.ok(user);
+    }
+
+    @DeleteMapping("/me")
+    public ResponseEntity<Map<String, String>> deleteAccount() {
+        userService.deleteCurrentUser();
+        return ResponseEntity.ok(Map.of("message", "Tài khoản đã được xóa thành công"));
     }
 }

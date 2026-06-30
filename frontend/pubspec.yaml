@@ -1,13 +1,15 @@
 name: tram_doc
 description: "Trạm Đọc - Đọc sách, ghi chú, ôn tập thông minh"
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ^3.10.7
 
 dependencies:
   flutter:
+    sdk: flutter
+  flutter_localizations:
     sdk: flutter
   
   # Icons
@@ -16,9 +18,10 @@ dependencies:
   # Navigation
   go_router: ^14.6.2
   
-  # State Management (BLoC)
+  # State Management (BLoC) & Locale
   flutter_bloc: ^8.1.6
   equatable: ^2.0.5
+  provider: ^6.1.2
   
   # HTTP & API
   dio: ^5.7.0
@@ -37,7 +40,7 @@ dependencies:
   fl_chart: ^0.69.2
   
   # Date & Formatting
-  intl: ^0.19.0
+  intl: ^0.20.2
   
   # Camera & Scanner
   mobile_scanner: ^7.0.0
@@ -59,6 +62,7 @@ dependencies:
   # Utils
   uuid: ^4.5.1
   path_provider: ^2.1.5
+  share_plus: ^10.1.4
   
   # Social Login
   google_sign_in: ^6.2.1

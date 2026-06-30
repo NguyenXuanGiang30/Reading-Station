@@ -9,14 +9,18 @@ services:
     region: singapore
     healthCheckPath: /actuator/health
     envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod-postgres
       - key: JWT_SECRET
         generateValue: true
-      - key: DDL_AUTO
-        value: update
-      - key: FLYWAY_ENABLED
+      - key: SPRING_JPA_HIBERNATE_DDL_AUTO
+        value: validate
+      - key: SPRING_FLYWAY_ENABLED
+        value: "true"
+      - key: SPRINGDOC_ENABLED
         value: "false"
       - key: CORS_ORIGINS
-        value: "*"
+        value: "https://app.example.com"
       - key: DATABASE_URL
         fromDatabase:
           name: tram-doc-db

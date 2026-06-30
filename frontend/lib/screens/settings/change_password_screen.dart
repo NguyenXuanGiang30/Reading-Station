@@ -1,12 +1,22 @@
-/// ChangePasswordScreen - Đổi mật khẩu
+/// ChangePasswordScreen - Doi mat khau
 library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../theme/colors.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_gradients.dart';
+import '../../theme/app_radius.dart';
+import '../../theme/app_spacing.dart';
+import '../../utils/validators.dart';
+import '../../widgets/common/custom_app_bar.dart';
+import '../../widgets/common/custom_text_field.dart';
+import '../../widgets/common/modern_card.dart';
+import '../../widgets/common/primary_button.dart';
+import '../../widgets/common/section_header.dart';
+import '../../widgets/data/status_chip.dart';
+import '../../l10n/app_localizations.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -20,7 +30,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   bool _obscureCurrent = true;
   bool _obscureNew = true;
   bool _obscureConfirm = true;
@@ -41,36 +51,28 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
     try {
       final api = ApiService();
-      await api.post('/auth/change-password', data: {
-        'currentPassword': _currentPasswordController.text,
-        'newPassword': _newPasswordController.text,
-        'confirmPassword': _confirmPasswordController.text,
-      });
+      await api.post(
+        '/auth/change-password',
+        data: {
+          'currentPassword': _currentPasswordController.text,
+          'newPassword': _newPasswordController.text,
+          'confirmPassword': _confirmPasswordController.text,
+        },
+      );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Đổi mật khẩu thành công!',
-              style: GoogleFonts.inter(),
-            ),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        context.pop();
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(S.of(context).t('change_pw_success'))));
+      context.pop();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Lỗi: ${e.toString().replaceAll('Exception: ', '')}',
-              style: GoogleFonts.inter(),
-            ),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Loi: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: AppColors.error,
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -80,217 +82,208 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Đổi mật khẩu',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-        ),
+      appBar: CustomAppBar(
+        title: S.of(context).t('change_pw_title'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Info card
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryStart.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: AppColors.primaryStart,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Mật khẩu mới phải có ít nhất 6 ký tự, chữ cái đầu viết hoa, có số và ký tự đặc biệt.',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeroCard(),
+                const SizedBox(height: AppSpacing.xl),
+                ModernCard(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SectionHeader(
+                        title: S.of(context).t('change_pw_info'),
+                        subtitle:
+                            S.of(context).t('change_pw_info_desc'),
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      CustomTextField(
+                        controller: _currentPasswordController,
+                        label: S.of(context).t('change_pw_current'),
+                        obscureText: _obscureCurrent,
+                        validator: (value) {
+                          final result = Validators.required(
+                            value,
+                            fieldName: S.of(context).t('change_pw_current'),
+                          );
+                          return result.isValid ? null : result.errorMessage;
+                        },
+                        prefix: const Icon(Icons.lock_outline_rounded),
+                        suffix: IconButton(
+                          onPressed: () => setState(
+                            () => _obscureCurrent = !_obscureCurrent,
+                          ),
+                          icon: Icon(
+                            _obscureCurrent
+                                ? Icons.visibility_off_rounded
+                                : Icons.visibility_rounded,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 32),
-
-              // Current password
-              _buildPasswordField(
-                controller: _currentPasswordController,
-                label: 'Mật khẩu hiện tại',
-                obscure: _obscureCurrent,
-                onToggle: () => setState(() => _obscureCurrent = !_obscureCurrent),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Vui lòng nhập mật khẩu hiện tại';
-                  }
-                  return null;
-                },
-                isDark: isDark,
-              ),
-
-              const SizedBox(height: 20),
-
-              // New password
-              _buildPasswordField(
-                controller: _newPasswordController,
-                label: 'Mật khẩu mới',
-                obscure: _obscureNew,
-                onToggle: () => setState(() => _obscureNew = !_obscureNew),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Vui lòng nhập mật khẩu mới';
-                  }
-                  if (value.length < 6) {
-                    return 'Mật khẩu phải có ít nhất 6 ký tự';
-                  }
-                  if (!RegExp(r'^[A-Z]').hasMatch(value)) {
-                    return 'Chữ cái đầu tiên phải viết hoa';
-                  }
-                  if (!RegExp(r'[0-9]').hasMatch(value)) {
-                    return 'Mật khẩu phải chứa ít nhất một số';
-                  }
-                  if (!RegExp(r'[!@#\$%^&*()_+\-=\[\]{};'':",./<>?~`]').hasMatch(value)) {
-                    return 'Mật khẩu phải chứa ký tự đặc biệt';
-                  }
-                  return null;
-                },
-                isDark: isDark,
-              ),
-
-              const SizedBox(height: 20),
-
-              // Confirm password
-              _buildPasswordField(
-                controller: _confirmPasswordController,
-                label: 'Xác nhận mật khẩu mới',
-                obscure: _obscureConfirm,
-                onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Vui lòng xác nhận mật khẩu mới';
-                  }
-                  if (value != _newPasswordController.text) {
-                    return 'Mật khẩu xác nhận không khớp';
-                  }
-                  return null;
-                },
-                isDark: isDark,
-              ),
-
-              const SizedBox(height: 40),
-
-              // Submit button
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _changePassword,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryStart,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(
-                          'Đổi mật khẩu',
-                          style: GoogleFonts.inter(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                      const SizedBox(height: AppSpacing.lg),
+                      CustomTextField(
+                        controller: _newPasswordController,
+                        label: S.of(context).t('change_pw_new'),
+                        obscureText: _obscureNew,
+                        validator: (value) {
+                          final result = Validators.strongPassword(value);
+                          return result.isValid ? null : result.errorMessage;
+                        },
+                        prefix: const Icon(Icons.password_rounded),
+                        suffix: IconButton(
+                          onPressed: () =>
+                              setState(() => _obscureNew = !_obscureNew),
+                          icon: Icon(
+                            _obscureNew
+                                ? Icons.visibility_off_rounded
+                                : Icons.visibility_rounded,
                           ),
                         ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      CustomTextField(
+                        controller: _confirmPasswordController,
+                        label: S.of(context).t('change_pw_confirm'),
+                        obscureText: _obscureConfirm,
+                        validator: (value) {
+                          final result = Validators.confirmPassword(
+                            value,
+                            _newPasswordController.text,
+                          );
+                          return result.isValid ? null : result.errorMessage;
+                        },
+                        prefix: const Icon(Icons.verified_user_outlined),
+                        suffix: IconButton(
+                          onPressed: () => setState(
+                            () => _obscureConfirm = !_obscureConfirm,
+                          ),
+                          icon: Icon(
+                            _obscureConfirm
+                                ? Icons.visibility_off_rounded
+                                : Icons.visibility_rounded,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: AppSpacing.xl),
+                ModernCard(
+                  padding: const EdgeInsets.all(20),
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primarySoft.withValues(alpha: 0.65),
+                      AppColors.surface,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        S.of(context).t('change_pw_checklist'),
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.sm,
+                        children: [
+                          StatusChip(
+                            label: S.of(context).t('change_pw_rule1'),
+                            color: AppColors.primary,
+                            icon: Icons.looks_6_rounded,
+                          ),
+                          StatusChip(
+                            label: S.of(context).t('change_pw_rule2'),
+                            color: AppColors.secondary,
+                            icon: Icons.text_fields_rounded,
+                          ),
+                          StatusChip(
+                            label: S.of(context).t('change_pw_rule3'),
+                            color: AppColors.warning,
+                            icon: Icons.shield_outlined,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxxl),
+                PrimaryButton(
+                  label: S.of(context).t('change_pw_btn'),
+                  loading: _isLoading,
+                  icon: const Icon(
+                    Icons.lock_reset_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                  onPressed: _changePassword,
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildPasswordField({
-    required TextEditingController controller,
-    required String label,
-    required bool obscure,
-    required VoidCallback onToggle,
-    required String? Function(String?) validator,
-    required bool isDark,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          obscureText: obscure,
-          validator: validator,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: isDark ? AppColors.cardDark : Colors.grey.shade50,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+  Widget _buildHeroCard() {
+    return ModernCard(
+      gradient: AppGradients.warmHero,
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.86),
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: AppColors.primaryStart,
-                width: 2,
-              ),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.error),
-            ),
-            suffixIcon: IconButton(
-              icon: Icon(
-                obscure ? Icons.visibility_off : Icons.visibility,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              ),
-              onPressed: onToggle,
+            child: const Icon(
+              Icons.lock_person_rounded,
+              color: AppColors.primary,
             ),
           ),
-        ),
-      ],
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  S.of(context).t('change_pw_hero_title'),
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  S.of(context).t('change_pw_hero_desc'),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

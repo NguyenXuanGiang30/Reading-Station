@@ -35,12 +35,18 @@ class Book extends Equatable {
       id: json['id']?.toString() ?? '',
       title: json['title'] ?? '',
       author: json['author'] ?? '',
-      coverUrl: json['coverUrl'] ?? json['cover_url'],
+      coverUrl: json['coverUrl'] ?? json['cover_url'] ?? json['coverImageUrl'],
       description: json['description'],
       isbn: json['isbn'],
       publisher: json['publisher'],
-      publishedYear: json['publishedYear'] ?? json['published_year'],
-      totalPages: json['totalPages'] ?? json['total_pages'] ?? 0,
+      publishedYear: json['publishedYear'] ??
+          json['published_year'] ??
+          (() {
+            final publishedDate = json['publishedDate']?.toString();
+            if (publishedDate == null || publishedDate.length < 4) return null;
+            return int.tryParse(publishedDate.substring(0, 4));
+          })(),
+      totalPages: json['totalPages'] ?? json['total_pages'] ?? json['pageCount'] ?? 0,
       category: json['category'],
       rating: (json['rating'] as num?)?.toDouble(),
     );

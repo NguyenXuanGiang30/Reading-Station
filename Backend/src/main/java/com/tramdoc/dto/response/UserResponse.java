@@ -17,5 +17,7 @@ public class UserResponse {
     private String fullName;
     private String avatarUrl;
     private String bio;
+    private Long friendshipId;
+    private String friendshipStatus;
     private LocalDateTime createdAt;
 }

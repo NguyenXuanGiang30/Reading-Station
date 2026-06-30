@@ -25,10 +25,13 @@ import 'screens/book/key_takeaways_screen.dart';
 import 'screens/review/review_hub_screen.dart';
 import 'screens/review/session_summary_screen.dart';
 import 'screens/flashcard/flashcard_session_screen.dart';
+import 'screens/flashcard/create_flashcard_screen.dart';
 import 'screens/focus/focus_mode_screen.dart';
 import 'screens/profile/user_profile_screen.dart';
 import 'screens/profile/edit_profile_screen.dart';
+import 'screens/search/search_screen.dart';
 import 'screens/notes/note_editor_screen.dart';
+import 'screens/notifications/notification_screen.dart';
 import 'screens/ocr/ocr_camera_screen.dart';
 import 'screens/ocr/ocr_edit_screen.dart';
 import 'screens/social/social_feed_screen.dart';
@@ -46,66 +49,67 @@ import 'screens/settings/data_management_screen.dart';
 import 'screens/settings/about_screen.dart';
 import 'screens/settings/terms_screen.dart';
 import 'screens/settings/help_support_screen.dart';
-
+import 'screens/ai/ai_chat_screen.dart';
 
 class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
   static final _shellNavigatorKey = GlobalKey<NavigatorState>();
-  
+
   static GoRouter router(AuthBloc authBloc) {
     return GoRouter(
       navigatorKey: _rootNavigatorKey,
       initialLocation: '/splash',
       debugLogDiagnostics: true,
-      
+
       // Redirect logic based on auth state
       redirect: (context, state) {
         final authState = authBloc.state;
-        final isOnAuthScreen = state.matchedLocation == '/login' ||
+        final isOnAuthScreen =
+            state.matchedLocation == '/login' ||
             state.matchedLocation == '/register' ||
             state.matchedLocation == '/forgot-password' ||
             state.matchedLocation.startsWith('/auth/verify-otp') ||
             state.matchedLocation.startsWith('/auth/reset-password');
         final isOnSplash = state.matchedLocation == '/splash';
         final isOnOnboarding = state.matchedLocation == '/onboarding';
-        
+
         // Allow splash and onboarding
         if (isOnSplash || isOnOnboarding) return null;
-        
+
         // First time user - show onboarding
         if (authState is AuthFirstTime) {
           return '/onboarding';
         }
-        
+
         // Not authenticated - go to login
         if (authState is AuthUnauthenticated && !isOnAuthScreen) {
           return '/login';
         }
-        
+
         // Authenticated - redirect away from auth screens
         if (authState is AuthAuthenticated && isOnAuthScreen) {
           return '/';
         }
-        
+
         return null;
       },
-      
+
       // Refresh when auth state changes
       refreshListenable: GoRouterRefreshStream(authBloc.stream),
-      
+
       routes: [
         // Splash Screen
         GoRoute(
           path: '/splash',
           builder: (context, state) => const SplashScreen(),
         ),
-        
+
         // Onboarding
         GoRoute(
           path: '/onboarding',
           builder: (context, state) => const OnboardingScreen(),
         ),
-        
+
         // Auth Routes
         GoRoute(
           path: '/login',
@@ -136,7 +140,7 @@ class AppRouter {
             );
           },
         ),
-        
+
         // Main App with Bottom Navigation
         ShellRoute(
           navigatorKey: _shellNavigatorKey,
@@ -147,25 +151,25 @@ class AppRouter {
               path: '/',
               builder: (context, state) => const HomeDashboard(),
             ),
-            
+
             // Library Tab
             GoRoute(
               path: '/library',
               builder: (context, state) => const MyLibraryScreen(),
             ),
-            
+
             // Review Tab
             GoRoute(
               path: '/review',
               builder: (context, state) => const ReviewHubScreen(),
             ),
-            
+
             // Profile Tab
             GoRoute(
               path: '/profile',
               builder: (context, state) => const UserProfileScreen(),
             ),
-            
+
             // Social Tab (Trust Circle)
             GoRoute(
               path: '/social',
@@ -173,7 +177,7 @@ class AppRouter {
             ),
           ],
         ),
-        
+
         // Add Book (MUST be before /book/:id to avoid matching 'add' as ID)
         GoRoute(
           path: '/book/add',
@@ -182,7 +186,7 @@ class AppRouter {
             return AddEditBookScreen(isbn: isbn);
           },
         ),
-        
+
         // Book Detail
         GoRoute(
           path: '/book/:id',
@@ -207,19 +211,20 @@ class AppRouter {
             ),
           ],
         ),
-        
+
         // Barcode Scanner
         GoRoute(
           path: '/scanner',
           builder: (context, state) => const BarcodeScannerScreen(),
         ),
-        
+
         // Create/Edit Note
         GoRoute(
           path: '/note/create',
           builder: (context, state) {
             final bookId = state.uri.queryParameters['bookId'];
-            return NoteEditorScreen(bookId: bookId);
+            final text = state.uri.queryParameters['text'];
+            return NoteEditorScreen(bookId: bookId, initialText: text);
           },
         ),
         GoRoute(
@@ -229,7 +234,7 @@ class AppRouter {
             return NoteEditorScreen(noteId: noteId);
           },
         ),
-        
+
         // OCR
         GoRoute(
           path: '/ocr',
@@ -246,7 +251,7 @@ class AppRouter {
             return OCREditScreen(imagePath: imagePath, bookId: bookId);
           },
         ),
-        
+
         // Flashcard Routes
         GoRoute(
           path: '/flashcard/create',
@@ -259,7 +264,7 @@ class AppRouter {
             return FlashcardSessionScreen(deckId: deckId);
           },
         ),
-        
+
         // Social - Moved to ShellRoute
         // GoRoute(
         //   path: '/social',
@@ -272,18 +277,28 @@ class AppRouter {
             return FriendProfileScreen(friendId: friendId);
           },
         ),
-        
+
         GoRoute(
           path: '/find-friend',
           builder: (context, state) => const FindFriendScreen(),
         ),
-        
+
+        GoRoute(
+          path: '/search',
+          builder: (context, state) => const SearchScreen(),
+        ),
+
+        GoRoute(
+          path: '/notifications',
+          builder: (context, state) => const NotificationScreen(),
+        ),
+
         // Edit profile
         GoRoute(
           path: '/profile/edit',
           builder: (context, state) => const EditProfileScreen(),
         ),
-        
+
         // Settings
         GoRoute(
           path: '/settings',
@@ -333,7 +348,13 @@ class AppRouter {
           path: '/settings/help',
           builder: (context, state) => const HelpSupportScreen(),
         ),
-        
+
+        // AI Chat
+        GoRoute(
+          path: '/ai-chat',
+          builder: (context, state) => const AiChatScreen(),
+        ),
+
         // Focus Mode
         GoRoute(
           path: '/focus',
@@ -343,7 +364,7 @@ class AppRouter {
             return FocusModeScreen(bookId: bookId, bookTitle: bookTitle);
           },
         ),
-        
+
         // Key Takeaways
         GoRoute(
           path: '/book/:id/takeaways',
@@ -353,15 +374,20 @@ class AppRouter {
             return KeyTakeawaysScreen(bookId: bookId, bookTitle: bookTitle);
           },
         ),
-        
+
         // Session Summary
         GoRoute(
           path: '/flashcard/summary',
           builder: (context, state) {
-            final total = int.tryParse(state.uri.queryParameters['total'] ?? '0') ?? 0;
-            final correct = int.tryParse(state.uri.queryParameters['correct'] ?? '0') ?? 0;
-            final incorrect = int.tryParse(state.uri.queryParameters['incorrect'] ?? '0') ?? 0;
-            final time = int.tryParse(state.uri.queryParameters['time'] ?? '0') ?? 0;
+            final total =
+                int.tryParse(state.uri.queryParameters['total'] ?? '0') ?? 0;
+            final correct =
+                int.tryParse(state.uri.queryParameters['correct'] ?? '0') ?? 0;
+            final incorrect =
+                int.tryParse(state.uri.queryParameters['incorrect'] ?? '0') ??
+                0;
+            final time =
+                int.tryParse(state.uri.queryParameters['time'] ?? '0') ?? 0;
             final deckName = state.uri.queryParameters['deck'];
             return SessionSummaryScreen(
               totalCards: total,

@@ -1,12 +1,20 @@
-/// ReadingGoalScreen - Cài đặt mục tiêu đọc sách
+/// ReadingGoalScreen - Cai dat muc tieu doc sach
 library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../theme/colors.dart';
 import '../../services/settings_service.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_gradients.dart';
+import '../../theme/app_radius.dart';
+import '../../theme/app_spacing.dart';
+import '../../widgets/common/custom_app_bar.dart';
+import '../../widgets/common/modern_card.dart';
+import '../../widgets/common/primary_button.dart';
+import '../../widgets/common/section_header.dart';
+import '../../widgets/data/status_chip.dart';
+import '../../l10n/app_localizations.dart';
 
 class ReadingGoalScreen extends StatefulWidget {
   const ReadingGoalScreen({super.key});
@@ -17,7 +25,7 @@ class ReadingGoalScreen extends StatefulWidget {
 
 class _ReadingGoalScreenState extends State<ReadingGoalScreen> {
   final SettingsService _settingsService = SettingsService();
-  
+
   int _goal = 24;
   bool _isLoading = true;
 
@@ -29,253 +37,236 @@ class _ReadingGoalScreenState extends State<ReadingGoalScreen> {
 
   Future<void> _loadGoal() async {
     final goal = await _settingsService.getReadingGoal();
-    if (mounted) {
-      setState(() {
-        _goal = goal;
-        _isLoading = false;
-      });
-    }
+    if (!mounted) return;
+    setState(() {
+      _goal = goal;
+      _isLoading = false;
+    });
   }
 
   Future<void> _saveGoal() async {
     await _settingsService.setReadingGoal(_goal);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Đã cập nhật mục tiêu: $_goal cuốn sách/năm',
-            style: GoogleFonts.inter(),
-          ),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      context.pop();
-    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(S.of(context).t('goal_saved'))),
+    );
+    context.pop();
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Mục tiêu đọc sách',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-        ),
+      appBar: CustomAppBar(
+        title: S.of(context).t('goal_title'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.all(20),
-                    children: [
-                      // Goal display
-                      Container(
-                        padding: const EdgeInsets.all(32),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [AppColors.primaryStart, AppColors.primaryEnd],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.flag_rounded,
-                              size: 48,
-                              color: Colors.white.withValues(alpha: 0.9),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              '$_goal',
-                              style: GoogleFonts.inter(
-                                fontSize: 64,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
+          : SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                      children: [
+                        _buildHeroCard(),
+                        const SizedBox(height: AppSpacing.xl),
+                        ModernCard(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SectionHeader(
+                                title: S.of(context).t('goal_adjust'),
+                                subtitle:
+                                    S.of(context).t('goal_adjust_desc'),
                               ),
-                            ),
-                            Text(
-                              'cuốn sách / năm',
-                              style: GoogleFonts.inter(
-                                fontSize: 16,
-                                color: Colors.white.withValues(alpha: 0.9),
+                              const SizedBox(height: AppSpacing.xl),
+                              Slider(
+                                value: _goal.toDouble(),
+                                min: 1,
+                                max: 100,
+                                divisions: 99,
+                                activeColor: AppColors.primary,
+                                inactiveColor: AppColors.primarySoft,
+                                onChanged: (value) =>
+                                    setState(() => _goal = value.round()),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 32),
-
-                      // Slider
-                      Text(
-                        'Điều chỉnh mục tiêu',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: isDark ? AppColors.cardDark : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: isDark
-                              ? []
-                              : [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.05),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    S.of(context).t('goal_min'),
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
+                                  Text(
+                                    S.of(context).t('goal_max'),
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
                                   ),
                                 ],
+                              ),
+                            ],
+                          ),
                         ),
-                        child: Column(
-                          children: [
-                            Slider(
-                              value: _goal.toDouble(),
-                              min: 1,
-                              max: 100,
-                              divisions: 99,
-                              activeColor: AppColors.primaryStart,
-                              onChanged: (value) {
-                                setState(() => _goal = value.round());
-                              },
-                            ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  '1 cuốn',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        const SizedBox(height: AppSpacing.xl),
+                        ModernCard(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                S.of(context).t('goal_quick'),
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              Wrap(
+                                spacing: AppSpacing.sm,
+                                runSpacing: AppSpacing.sm,
+                                children: [6, 12, 24, 36, 52].map((value) {
+                                  final isSelected = _goal == value;
+                                  return ChoiceChip(
+                                    label: Text('$value'),
+                                    selected: isSelected,
+                                    onSelected: (_) =>
+                                        setState(() => _goal = value),
+                                    selectedColor: AppColors.primarySoft,
+                                    labelStyle: Theme.of(context)
+                                        .textTheme
+                                        .labelLarge
+                                        ?.copyWith(
+                                          color: isSelected
+                                              ? AppColors.primary
+                                              : null,
+                                        ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(999),
+                                      side: BorderSide(
+                                        color: isSelected
+                                            ? AppColors.primary
+                                            : AppColors.border,
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: AppSpacing.xl),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: AppColors.warning.withValues(
+                                    alpha: 0.10,
+                                  ),
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.md,
                                   ),
                                 ),
-                                Text(
-                                  '100 cuốn',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Quick select
-                      Text(
-                        'Hoặc chọn nhanh',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [6, 12, 24, 36, 52].map((value) {
-                          final isSelected = _goal == value;
-                          return GestureDetector(
-                            onTap: () => setState(() => _goal = value),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: isSelected ? AppColors.primaryStart : (isDark ? AppColors.cardDark : Colors.white),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isSelected ? AppColors.primaryStart : (isDark ? Colors.grey.shade700 : Colors.grey.shade300),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Icon(
+                                      Icons.tips_and_updates_outlined,
+                                      color: AppColors.warning,
+                                    ),
+                                    const SizedBox(width: AppSpacing.md),
+                                    Expanded(
+                                      child: Text(
+                                        S.of(context).t('goal_tip'),
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              child: Text(
-                                '$value cuốn',
-                                style: GoogleFonts.inter(
-                                  fontWeight: FontWeight.w500,
-                                  color: isSelected ? Colors.white : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Tips
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColors.warning.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
+                            ],
+                          ),
                         ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(Icons.tips_and_updates, color: AppColors.warning, size: 20),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                'Mẹo: Bắt đầu với mục tiêu nhỏ (12-24 cuốn/năm) để xây dựng thói quen đọc đều đặn.',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Save button
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: _saveGoal,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryStart,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        'Lưu mục tiêu',
-                        style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      ],
                     ),
                   ),
-                ),
-              ],
+                  SafeArea(
+                    top: false,
+                    minimum: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                    child: PrimaryButton(
+                      label: S.of(context).t('goal_save'),
+                      icon: const Icon(
+                        Icons.flag_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      onPressed: _saveGoal,
+                    ),
+                  ),
+                ],
+              ),
             ),
+    );
+  }
+
+  Widget _buildHeroCard() {
+    return ModernCard(
+      gradient: AppGradients.sunriseAccent,
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.flag_circle_rounded,
+              color: Colors.white,
+              size: 38,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            '$_goal',
+            style: Theme.of(
+              context,
+            ).textTheme.displayLarge?.copyWith(color: Colors.white),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            S.of(context).t('goal_unit'),
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: Colors.white.withValues(alpha: 0.88),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              StatusChip(
+                label: S.of(context).t('goal_current'),
+                color: Colors.white,
+                icon: Icons.auto_awesome_rounded,
+              ),
+              StatusChip(
+                label: _goal >= 24 ? S.of(context).t('goal_ambitious') : S.of(context).t('goal_easy'),
+                color: Colors.white,
+                icon: Icons.trending_up_rounded,
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,6 +1,7 @@
 package com.tramdoc.service;
 
 import com.tramdoc.dto.request.CreateFlashcardRequest;
+import com.tramdoc.dto.request.UpdateFlashcardRequest;
 import com.tramdoc.dto.request.ReviewFlashcardRequest;
 import com.tramdoc.dto.response.DeckStatsResponse;
 import com.tramdoc.dto.response.FlashcardResponse;
@@ -89,6 +90,43 @@ public class FlashcardService {
         }
         
         return mapToFlashcardResponse(flashcard);
+    }
+    
+    @Transactional
+    public FlashcardResponse updateFlashcard(Long flashcardId, UpdateFlashcardRequest request) {
+        Long userId = getCurrentUserId();
+        Flashcard flashcard = flashcardRepository.findById(flashcardId)
+            .orElseThrow(() -> new ResourceNotFoundException("Flashcard not found"));
+        
+        if (!flashcard.getUser().getId().equals(userId)) {
+            throw new BadRequestException("You don't have permission to update this flashcard");
+        }
+        
+        if (request.getQuestion() != null && !request.getQuestion().isBlank()) {
+            flashcard.setQuestion(request.getQuestion());
+        }
+        if (request.getAnswer() != null && !request.getAnswer().isBlank()) {
+            flashcard.setAnswer(request.getAnswer());
+        }
+        if (request.getDeckName() != null && !request.getDeckName().isBlank()) {
+            flashcard.setDeckName(request.getDeckName());
+        }
+        
+        flashcard = flashcardRepository.save(flashcard);
+        return mapToFlashcardResponse(flashcard);
+    }
+    
+    @Transactional
+    public void deleteFlashcard(Long flashcardId) {
+        Long userId = getCurrentUserId();
+        Flashcard flashcard = flashcardRepository.findById(flashcardId)
+            .orElseThrow(() -> new ResourceNotFoundException("Flashcard not found"));
+        
+        if (!flashcard.getUser().getId().equals(userId)) {
+            throw new BadRequestException("You don't have permission to delete this flashcard");
+        }
+        
+        flashcardRepository.delete(flashcard);
     }
     
     @Transactional
@@ -236,9 +274,12 @@ public class FlashcardService {
                 .count();
             
             double masteryPercentage = totalCards > 0 ? (masteredCards * 100.0 / totalCards) : 0.0;
+            Flashcard firstCard = deckCards.isEmpty() ? null : deckCards.get(0);
             
             return DeckStatsResponse.builder()
+                .bookId(firstCard != null ? firstCard.getBook().getId() : null)
                 .deckName(deckName)
+                .bookCoverUrl(firstCard != null ? firstCard.getBook().getCoverImageUrl() : null)
                 .totalCards(totalCards)
                 .dueCards(dueCards)
                 .masteredCards(masteredCards)

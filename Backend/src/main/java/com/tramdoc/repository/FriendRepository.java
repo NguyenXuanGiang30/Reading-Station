@@ -17,6 +17,11 @@ public interface FriendRepository extends JpaRepository<Friend, Long> {
     Optional<Friend> findByUserIdAndFriendId(Long userId, Long friendId);
     Page<Friend> findByUserIdAndStatus(Long userId, FriendStatus status, Pageable pageable);
     Page<Friend> findByFriendIdAndStatus(Long friendId, FriendStatus status, Pageable pageable);
+
+    @Query("SELECT f FROM Friend f WHERE (f.user.id = :userId OR f.friend.id = :userId) AND f.status = :status")
+    Page<Friend> findByParticipantIdAndStatus(@Param("userId") Long userId,
+                                              @Param("status") FriendStatus status,
+                                              Pageable pageable);
     
     @Query("SELECT f FROM Friend f WHERE (f.user.id = :userId OR f.friend.id = :userId) AND f.status = 'ACCEPTED'")
     List<Friend> findAcceptedFriends(@Param("userId") Long userId);

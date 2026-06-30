@@ -1,0 +1,148 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] --------------------< com.tramdoc:tram-doc-backend >--------------------
+[INFO] Building Tr?m ??c Backend API 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ tram-doc-backend ---
+[INFO] Deleting D:\Reading_Station\Backend\target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ tram-doc-backend ---
+[INFO] Copying 3 resources from src\main\resources to target\classes
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ tram-doc-backend ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 127 source files with javac [debug release 17] to target\classes
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR : 
+[INFO] -------------------------------------------------------------
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[10,59] package org.springframework.security.oauth2.client.userinfo does not exist
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[11,59] package org.springframework.security.oauth2.client.userinfo does not exist
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[12,48] package org.springframework.security.oauth2.core does not exist
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[13,53] package org.springframework.security.oauth2.core.user does not exist
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[20,46] cannot find symbol
+  symbol: class DefaultOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/HttpCookieOAuth2AuthorizationRequestRepository.java:[5,54] package org.springframework.security.oauth2.client.web does not exist
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/HttpCookieOAuth2AuthorizationRequestRepository.java:[6,57] package org.springframework.security.oauth2.core.endpoint does not exist
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/HttpCookieOAuth2AuthorizationRequestRepository.java:[11,72] cannot find symbol
+  symbol: class AuthorizationRequestRepository
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/HttpCookieOAuth2AuthorizationRequestRepository.java:[11,103] cannot find symbol
+  symbol: class OAuth2AuthorizationRequest
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/HttpCookieOAuth2AuthorizationRequestRepository.java:[17,12] cannot find symbol
+  symbol:   class OAuth2AuthorizationRequest
+  location: class com.tramdoc.security.oauth2.HttpCookieOAuth2AuthorizationRequestRepository
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/HttpCookieOAuth2AuthorizationRequestRepository.java:[24,42] cannot find symbol
+  symbol:   class OAuth2AuthorizationRequest
+  location: class com.tramdoc.security.oauth2.HttpCookieOAuth2AuthorizationRequestRepository
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/HttpCookieOAuth2AuthorizationRequestRepository.java:[39,12] cannot find symbol
+  symbol:   class OAuth2AuthorizationRequest
+  location: class com.tramdoc.security.oauth2.HttpCookieOAuth2AuthorizationRequestRepository
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[26,32] cannot find symbol
+  symbol:   class OAuth2UserRequest
+  location: class com.tramdoc.security.oauth2.CustomOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[26,12] cannot find symbol
+  symbol:   class OAuth2User
+  location: class com.tramdoc.security.oauth2.CustomOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[26,76] cannot find symbol
+  symbol:   class OAuth2AuthenticationException
+  location: class com.tramdoc.security.oauth2.CustomOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[39,42] cannot find symbol
+  symbol:   class OAuth2UserRequest
+  location: class com.tramdoc.security.oauth2.CustomOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[39,79] cannot find symbol
+  symbol:   class OAuth2User
+  location: class com.tramdoc.security.oauth2.CustomOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[39,13] cannot find symbol
+  symbol:   class OAuth2User
+  location: class com.tramdoc.security.oauth2.CustomOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[62,34] cannot find symbol
+  symbol:   class OAuth2UserRequest
+  location: class com.tramdoc.security.oauth2.CustomOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[62,71] cannot find symbol
+  symbol:   class OAuth2User
+  location: class com.tramdoc.security.oauth2.CustomOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[79,56] cannot find symbol
+  symbol:   class OAuth2User
+  location: class com.tramdoc.security.oauth2.CustomOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/service/EmailService.java:[5,32] package org.springframework.mail does not exist
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/service/EmailService.java:[6,41] package org.springframework.mail.javamail does not exist
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/service/EmailService.java:[13,13] cannot find symbol
+  symbol:   class JavaMailSender
+  location: class com.tramdoc.service.EmailService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/UserPrincipal.java:[10,53] package org.springframework.security.oauth2.core.user does not exist
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/UserPrincipal.java:[18,52] cannot find symbol
+  symbol: class OAuth2User
+[INFO] 26 errors 
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  3.913 s
+[INFO] Finished at: 2026-03-14T10:20:29+07:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.11.0:compile (default-compile) on project tram-doc-backend: Compilation failure: Compilation failure: 
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[10,59] package org.springframework.security.oauth2.client.userinfo does not exist
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[11,59] package org.springframework.security.oauth2.client.userinfo does not exist
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[12,48] package org.springframework.security.oauth2.core does not exist
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[13,53] package org.springframework.security.oauth2.core.user does not exist
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[20,46] cannot find symbol
+[ERROR]   symbol: class DefaultOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/HttpCookieOAuth2AuthorizationRequestRepository.java:[5,54] package org.springframework.security.oauth2.client.web does not exist
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/HttpCookieOAuth2AuthorizationRequestRepository.java:[6,57] package org.springframework.security.oauth2.core.endpoint does not exist
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/HttpCookieOAuth2AuthorizationRequestRepository.java:[11,72] cannot find symbol
+[ERROR]   symbol: class AuthorizationRequestRepository
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/HttpCookieOAuth2AuthorizationRequestRepository.java:[11,103] cannot find symbol
+[ERROR]   symbol: class OAuth2AuthorizationRequest
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/HttpCookieOAuth2AuthorizationRequestRepository.java:[17,12] cannot find symbol
+[ERROR]   symbol:   class OAuth2AuthorizationRequest
+[ERROR]   location: class com.tramdoc.security.oauth2.HttpCookieOAuth2AuthorizationRequestRepository
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/HttpCookieOAuth2AuthorizationRequestRepository.java:[24,42] cannot find symbol
+[ERROR]   symbol:   class OAuth2AuthorizationRequest
+[ERROR]   location: class com.tramdoc.security.oauth2.HttpCookieOAuth2AuthorizationRequestRepository
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/HttpCookieOAuth2AuthorizationRequestRepository.java:[39,12] cannot find symbol
+[ERROR]   symbol:   class OAuth2AuthorizationRequest
+[ERROR]   location: class com.tramdoc.security.oauth2.HttpCookieOAuth2AuthorizationRequestRepository
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[26,32] cannot find symbol
+[ERROR]   symbol:   class OAuth2UserRequest
+[ERROR]   location: class com.tramdoc.security.oauth2.CustomOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[26,12] cannot find symbol
+[ERROR]   symbol:   class OAuth2User
+[ERROR]   location: class com.tramdoc.security.oauth2.CustomOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[26,76] cannot find symbol
+[ERROR]   symbol:   class OAuth2AuthenticationException
+[ERROR]   location: class com.tramdoc.security.oauth2.CustomOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[39,42] cannot find symbol
+[ERROR]   symbol:   class OAuth2UserRequest
+[ERROR]   location: class com.tramdoc.security.oauth2.CustomOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[39,79] cannot find symbol
+[ERROR]   symbol:   class OAuth2User
+[ERROR]   location: class com.tramdoc.security.oauth2.CustomOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[39,13] cannot find symbol
+[ERROR]   symbol:   class OAuth2User
+[ERROR]   location: class com.tramdoc.security.oauth2.CustomOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[62,34] cannot find symbol
+[ERROR]   symbol:   class OAuth2UserRequest
+[ERROR]   location: class com.tramdoc.security.oauth2.CustomOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[62,71] cannot find symbol
+[ERROR]   symbol:   class OAuth2User
+[ERROR]   location: class com.tramdoc.security.oauth2.CustomOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/oauth2/CustomOAuth2UserService.java:[79,56] cannot find symbol
+[ERROR]   symbol:   class OAuth2User
+[ERROR]   location: class com.tramdoc.security.oauth2.CustomOAuth2UserService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/service/EmailService.java:[5,32] package org.springframework.mail does not exist
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/service/EmailService.java:[6,41] package org.springframework.mail.javamail does not exist
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/service/EmailService.java:[13,13] cannot find symbol
+[ERROR]   symbol:   class JavaMailSender
+[ERROR]   location: class com.tramdoc.service.EmailService
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/UserPrincipal.java:[10,53] package org.springframework.security.oauth2.core.user does not exist
+[ERROR] /D:/Reading_Station/Backend/src/main/java/com/tramdoc/security/UserPrincipal.java:[18,52] cannot find symbol
+[ERROR]   symbol: class OAuth2User
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

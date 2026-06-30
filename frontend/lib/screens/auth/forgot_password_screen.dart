@@ -3,10 +3,15 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../theme/colors.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_spacing.dart';
+import '../../utils/validators.dart';
+import '../../widgets/common/auth_scaffold.dart';
+import '../../widgets/common/custom_text_field.dart';
+import '../../widgets/common/primary_button.dart';
+import '../../l10n/app_localizations.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -30,192 +35,69 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
-
     try {
       final api = ApiService();
-      await api.post('/auth/forgot-password', data: {
-        'email': _emailController.text.trim(),
-      });
+      await api.post(
+        '/auth/forgot-password',
+        data: {'email': _emailController.text.trim()},
+      );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Mã OTP đã được gửi đến email của bạn',
-              style: GoogleFonts.inter(),
-            ),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        // Navigate to OTP verification screen
-        context.push('/auth/verify-otp', extra: _emailController.text.trim());
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(S.of(context).t('auth_otp_sent')),
+          backgroundColor: AppColors.success,
+        ),
+      );
+      context.push('/auth/verify-otp', extra: _emailController.text.trim());
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Lỗi: ${e.toString().replaceAll('Exception: ', '')}',
-              style: GoogleFonts.inter(),
-            ),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${S.of(context).t("error")}: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: AppColors.error,
+        ),
+      );
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
+    return AuthScaffold(
+      title: S.of(context).t('auth_forgot'),
+      subtitle: S.of(context).t('auth_forgot_subtitle'),
+      icon: Icons.lock_reset_rounded,
+      onBack: () => context.pop(),
+      footer: Center(
+        child: TextButton(
           onPressed: () => context.pop(),
+          child: Text(S.of(context).t('auth_back_login')),
         ),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Icon
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryStart.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Icon(
-                    Icons.lock_reset,
-                    size: 40,
-                    color: AppColors.primaryStart,
-                  ),
-                ),
-
-                const SizedBox(height: 32),
-
-                Text(
-                  'Quên mật khẩu?',
-                  style: GoogleFonts.playfairDisplay(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                Text(
-                  'Nhập email đã đăng ký, chúng tôi sẽ gửi mã OTP để đặt lại mật khẩu.',
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                    height: 1.5,
-                  ),
-                ),
-
-                const SizedBox(height: 40),
-
-                // Email field
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  autocorrect: false,
-                  decoration: InputDecoration(
-                    labelText: 'Email',
-                    hintText: 'example@gmail.com',
-                    prefixIcon: const Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: AppColors.primaryStart,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Vui lòng nhập email';
-                    }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                      return 'Email không hợp lệ';
-                    }
-                    return null;
-                  },
-                ),
-
-                const SizedBox(height: 32),
-
-                // Submit button
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _sendOtp,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryStart,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : Text(
-                            'Gửi mã OTP',
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Back to login
-                Center(
-                  child: TextButton(
-                    onPressed: () => context.pop(),
-                    child: Text(
-                      'Quay lại đăng nhập',
-                      style: GoogleFonts.inter(
-                        color: AppColors.primaryStart,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+      child: Form(
+        key: _formKey,
+        child: Column(
+          children: [
+            CustomTextField(
+              controller: _emailController,
+              label: S.of(context).t('auth_email'),
+              hint: 'example@gmail.com',
+              keyboardType: TextInputType.emailAddress,
+              prefix: const Icon(Icons.email_outlined),
+              validator: (value) {
+                final result = Validators.email(value);
+                return result.isValid ? null : result.errorMessage;
+              },
             ),
-          ),
+            const SizedBox(height: AppSpacing.xl),
+            PrimaryButton(
+              label: S.of(context).t('auth_send_otp'),
+              onPressed: _sendOtp,
+              loading: _isLoading,
+            ),
+          ],
         ),
       ),
     );

@@ -1,0 +1,19 @@
+# Local Executables
+*.exe
+
+# Logs
+*.log
+*_logs.txt
+*.err
+*.out
+startup-log.txt
+
+# Database and Tunnel configs/temp files
+mysql-init.txt
+temp_books.json
+test.json
+user_check2.txt
+users.txt
+
+# Ignore root-level SQL scripts (but preserve migration folder SQLs)
+/*.sql

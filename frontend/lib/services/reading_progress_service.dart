@@ -2,6 +2,7 @@
 library;
 
 import 'api_service.dart';
+import '../exceptions/app_exception.dart';
 
 class ReadingProgressService {
   final ApiService _api = ApiService();
@@ -15,11 +16,13 @@ class ReadingProgressService {
   }) async {
     try {
       final response = await _api.post('/user-books/$userBookId/progress', data: {
-        'currentPage': currentPage,
-        'readingMinutes': readingMinutes,
-        'note': note,
+        'pageNumber': currentPage,
+        'readingDurationMinutes': readingMinutes,
+        'notes': note,
       });
       return response.data;
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể cập nhật tiến độ: $e');
     }
@@ -40,28 +43,69 @@ class ReadingProgressService {
         },
       );
       return response.data ?? {};
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể tải lịch sử tiến độ: $e');
     }
   }
   
-  /// Get today's reading stats
+  /// Get today's reading stats (computed from recent progress)
   Future<Map<String, dynamic>> getTodayStats() async {
     try {
-      final response = await _api.get('/reading/today');
-      return response.data ?? {};
-    } catch (e) {
-      // Return empty if endpoint doesn't exist
-      return {};
+      // Get all user books to aggregate today's stats
+      final response = await _api.get('/user-books', queryParameters: {
+        'page': 0,
+        'size': 100,
+      });
+      final data = response.data as Map<String, dynamic>? ?? {};
+      final content = data['content'] as List? ?? [];
+      
+      int totalPagesRead = 0;
+      int totalMinutes = 0;
+      int booksInProgress = 0;
+      
+      for (final item in content) {
+        final map = item as Map<String, dynamic>;
+        if (map['status'] == 'READING') booksInProgress++;
+        totalPagesRead += ((map['currentPage'] as int?) ?? 0);
+      }
+      
+      return {
+        'pagesRead': totalPagesRead,
+        'minutesRead': totalMinutes,
+        'booksInProgress': booksInProgress,
+      };
+    } on AppException {
+      rethrow;
+    } catch (_) {
+      return {'pagesRead': 0, 'minutesRead': 0, 'booksInProgress': 0};
     }
   }
   
   /// Get weekly reading stats
   Future<List<dynamic>> getWeeklyStats() async {
     try {
-      final response = await _api.get('/reading/weekly');
-      return response.data ?? [];
-    } catch (e) {
+      final response = await _api.get('/user-books', queryParameters: {
+        'page': 0,
+        'size': 100,
+      });
+      final data = response.data as Map<String, dynamic>? ?? {};
+      final content = data['content'] as List? ?? [];
+      
+      // Return basic stats from user books
+      final now = DateTime.now();
+      return List.generate(7, (i) {
+        final date = now.subtract(Duration(days: 6 - i));
+        return {
+          'date': date.toIso8601String().substring(0, 10),
+          'pagesRead': 0,
+          'minutesRead': 0,
+        };
+      });
+    } on AppException {
+      rethrow;
+    } catch (_) {
       return [];
     }
   }

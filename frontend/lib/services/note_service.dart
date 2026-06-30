@@ -1,17 +1,16 @@
 /// Note Service - API calls for notes management
 library;
 
+import 'package:dio/dio.dart';
+
 import '../models/note.dart';
 import 'api_service.dart';
+import '../exceptions/app_exception.dart';
 
 class NoteService {
   final ApiService _api = ApiService();
-  
-  /// Get all notes for a book
-  Future<List<Note>> getNotesByBook(String bookId, {
-    int page = 0,
-    int size = 50,
-  }) async {
+
+  Future<List<Note>> getNotesByBook(String bookId, {int page = 0, int size = 50}) async {
     try {
       final response = await _api.get(
         '/notes',
@@ -21,63 +20,65 @@ class NoteService {
           'size': size,
         },
       );
-      
+
       if (response.data != null) {
-        final content = response.data['content'] as List;
-        return content.map((json) => Note.fromJson(json)).toList();
+        final content = response.data['content'] as List? ?? const [];
+        return content
+            .map((json) => Note.fromJson(json as Map<String, dynamic>))
+            .toList();
       }
       return [];
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể tải ghi chú: $e');
+      throw Exception('Khong the tai ghi chu: $e');
     }
   }
-  
-  /// Get all notes for current user
-  Future<List<Note>> getAllNotes({
-    int page = 0,
-    int size = 50,
-    String? search,
-  }) async {
+
+  Future<List<Note>> getAllNotes({int page = 0, int size = 50, String? search}) async {
     try {
       final queryParams = <String, dynamic>{
         'page': page,
         'size': size,
       };
-      
-      if (search != null && search.isNotEmpty) {
-        queryParams['search'] = search;
-      }
-      
-      final response = await _api.get('/notes', queryParameters: queryParams);
-      
+
+      final response = await _api.get(
+        search != null && search.isNotEmpty ? '/notes/search' : '/notes',
+        queryParameters: {
+          ...queryParams,
+          if (search != null && search.isNotEmpty) 'q': search,
+        },
+      );
+
       if (response.data != null) {
-        final content = response.data['content'] as List;
-        return content.map((json) => Note.fromJson(json)).toList();
+        final content = response.data['content'] as List? ?? const [];
+        return content
+            .map((json) => Note.fromJson(json as Map<String, dynamic>))
+            .toList();
       }
       return [];
     } catch (e) {
-      throw Exception('Không thể tải ghi chú: $e');
+      throw Exception('Khong the tai ghi chu: $e');
     }
   }
-  
-  /// Get note by ID
+
   Future<Note?> getNoteById(String id) async {
     try {
       final response = await _api.get('/notes/$id');
       if (response.data != null) {
-        return Note.fromJson(response.data);
+        return Note.fromJson(response.data as Map<String, dynamic>);
       }
       return null;
     } catch (e) {
-      throw Exception('Không thể tải ghi chú: $e');
+      throw Exception('Khong the tai ghi chu: $e');
     }
   }
-  
-  /// Create a new note
+
   Future<Note?> createNote({
     required String bookId,
     required String content,
     int? pageNumber,
+    String? ocrImageUrl,
     List<String>? tags,
     bool createFlashcard = false,
   }) async {
@@ -86,70 +87,78 @@ class NoteService {
         'bookId': bookId,
         'content': content,
         'pageNumber': pageNumber,
-        'tags': tags ?? [],
-        'createFlashcard': createFlashcard,
+        'tags': (tags ?? []).join(','),
+        'ocrImageUrl': ocrImageUrl,
       });
-      
+
       if (response.data != null) {
-        return Note.fromJson(response.data);
+        final note = Note.fromJson(response.data as Map<String, dynamic>);
+        if (createFlashcard) {
+          await createFlashcardFromNote(note.id);
+        }
+        return note;
       }
       return null;
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể tạo ghi chú: $e');
+      throw Exception('Khong the tao ghi chu: $e');
     }
   }
-  
-  /// Update note
-  Future<Note?> updateNote(String id, {
-    String? content,
-    int? pageNumber,
-    List<String>? tags,
-  }) async {
+
+  Future<Note?> updateNote(String id, {String? content, int? pageNumber, List<String>? tags}) async {
     try {
       final data = <String, dynamic>{};
       if (content != null) data['content'] = content;
       if (pageNumber != null) data['pageNumber'] = pageNumber;
-      if (tags != null) data['tags'] = tags;
-      
+      if (tags != null) data['tags'] = tags.join(',');
+
       final response = await _api.put('/notes/$id', data: data);
       if (response.data != null) {
-        return Note.fromJson(response.data);
+        return Note.fromJson(response.data as Map<String, dynamic>);
       }
       return null;
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể cập nhật ghi chú: $e');
+      throw Exception('Khong the cap nhat ghi chu: $e');
     }
   }
-  
-  /// Delete note
+
   Future<bool> deleteNote(String id) async {
     try {
       await _api.delete('/notes/$id');
       return true;
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể xóa ghi chú: $e');
+      throw Exception('Khong the xoa ghi chu: $e');
     }
   }
-  
-  /// Get notes count for a book
+
   Future<int> getNotesCount(String bookId) async {
     try {
-      final response = await _api.get('/notes/count', queryParameters: {
+      final response = await _api.get('/notes', queryParameters: {
         'bookId': bookId,
+        'page': 0,
+        'size': 1,
       });
-      return response.data?['count'] ?? 0;
-    } catch (e) {
+      return response.data?['totalElements'] ?? 0;
+    } on AppException {
+      rethrow;
+    } catch (_) {
       return 0;
     }
   }
-  
-  /// Create flashcard from note
+
   Future<bool> createFlashcardFromNote(String noteId) async {
     try {
-      await _api.post('/notes/$noteId/flashcard');
+      await _api.post('/notes/$noteId/convert-to-flashcard');
       return true;
+    } on DioException catch (e) {
+      throw Exception('Khong the tao flashcard: ${e.message}');
     } catch (e) {
-      throw Exception('Không thể tạo flashcard: $e');
+      throw Exception('Khong the tao flashcard: $e');
     }
   }
 }

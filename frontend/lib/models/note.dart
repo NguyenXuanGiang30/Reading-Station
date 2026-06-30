@@ -27,6 +27,23 @@ class Note extends Equatable {
     this.createdAt,
     this.updatedAt,
   });
+
+  static List<String> _parseTags(dynamic rawTags) {
+    if (rawTags is List) {
+      return rawTags
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    if (rawTags is String) {
+      return rawTags
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    return const [];
+  }
   
   factory Note.fromJson(Map<String, dynamic> json) {
     return Note(
@@ -36,7 +53,7 @@ class Note extends Equatable {
       content: json['content'] ?? '',
       pageNumber: json['pageNumber'] ?? json['page_number'],
       ocrImageUrl: json['ocrImageUrl'] ?? json['ocr_image_url'],
-      tags: (json['tags'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+      tags: _parseTags(json['tags']),
       isFlashcard: json['isFlashcard'] ?? json['is_flashcard'] ?? false,
       createdAt: json['createdAt'] != null 
           ? DateTime.tryParse(json['createdAt']) 

@@ -1,16 +1,23 @@
-/// SettingsScreen - Cài đặt ứng dụng
+﻿/// SettingsScreen - Cai dat ung dung
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../theme/colors.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/auth/auth_event.dart';
 import '../../blocs/theme/theme_cubit.dart';
 import '../../services/settings_service.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_gradients.dart';
+import '../../theme/app_radius.dart';
+import '../../theme/app_spacing.dart';
+import '../../widgets/common/custom_app_bar.dart';
+import '../../widgets/common/modern_card.dart';
+import '../../widgets/common/section_header.dart';
+import '../../widgets/states/loading_widget.dart';
+import '../../l10n/app_localizations.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -21,376 +28,412 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final SettingsService _settingsService = SettingsService();
-  
+
   int _readingGoal = 24;
   int _cardsPerSession = 20;
   String _language = 'vi';
   TimeOfDay _readingTime = const TimeOfDay(hour: 20, minute: 0);
   TimeOfDay _reviewTime = const TimeOfDay(hour: 9, minute: 0);
-  
+  bool _isLoading = true;
+
   @override
   void initState() {
     super.initState();
     _loadSettings();
   }
-  
+
   Future<void> _loadSettings() async {
     final goal = await _settingsService.getReadingGoal();
     final cards = await _settingsService.getCardsPerSession();
-    final lang = await _settingsService.getLanguage();
+    final language = await _settingsService.getLanguage();
     final readingTimeMap = await _settingsService.getReadingReminderTime();
     final reviewTimeMap = await _settingsService.getReviewReminderTime();
-    
-    if (mounted) {
-      setState(() {
-        _readingGoal = goal;
-        _cardsPerSession = cards;
-        _language = lang;
-        _readingTime = TimeOfDay(hour: readingTimeMap['hour']!, minute: readingTimeMap['minute']!);
-        _reviewTime = TimeOfDay(hour: reviewTimeMap['hour']!, minute: reviewTimeMap['minute']!);
-      });
-    }
+
+    if (!mounted) return;
+    setState(() {
+      _readingGoal = goal;
+      _cardsPerSession = cards;
+      _language = language;
+      _readingTime = TimeOfDay(
+        hour: readingTimeMap['hour']!,
+        minute: readingTimeMap['minute']!,
+      );
+      _reviewTime = TimeOfDay(
+        hour: reviewTimeMap['hour']!,
+        minute: reviewTimeMap['minute']!,
+      );
+      _isLoading = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+    final themeCubit = context.watch<ThemeCubit>();
+    final isDarkMode = themeCubit.state == ThemeMode.dark;
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Cài đặt',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-        ),
+      appBar: CustomAppBar(
+        title: S.of(context).t('settings_title'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          // Account section
-          _buildSectionHeader('Tài khoản', isDark),
-          _buildSettingCard([
-            _buildSettingItem(
-              icon: Icons.person_outline,
-              title: 'Chỉnh sửa hồ sơ',
-              onTap: () => context.push('/profile/edit'),
-              isDark: isDark,
-            ),
-            _buildDivider(),
-            _buildSettingItem(
-              icon: Icons.lock_outline,
-              title: 'Đổi mật khẩu',
-              onTap: () => context.push('/settings/change-password'),
-              isDark: isDark,
-            ),
-            _buildDivider(),
-            _buildSettingItem(
-              icon: Icons.privacy_tip_outlined,
-              title: 'Quyền riêng tư',
-              onTap: () => context.push('/settings/privacy'),
-              isDark: isDark,
-            ),
-          ], isDark),
-          
-          const SizedBox(height: 24),
-          
-          // App settings section
-          _buildSectionHeader('Ứng dụng', isDark),
-          _buildSettingCard([
-            _buildSwitchItem(
-              icon: Icons.dark_mode_outlined,
-              title: 'Chế độ tối',
-              value: isDark,
-              onChanged: (value) {
-                context.read<ThemeCubit>().toggleTheme();
-              },
-              isDark: isDark,
-            ),
-            _buildDivider(),
-            _buildSettingItem(
-              icon: Icons.notifications_outlined,
-              title: 'Thông báo',
-              subtitle: 'Nhắc nhở ôn tập, mục tiêu đọc',
-              onTap: () => context.push('/settings/notifications'),
-              isDark: isDark,
-            ),
-            _buildDivider(),
-            _buildSettingItem(
-              icon: Icons.language_outlined,
-              title: 'Ngôn ngữ',
-              subtitle: _language == 'vi' ? 'Tiếng Việt' : 'English',
-              onTap: () async {
-                await context.push('/settings/language');
-                _loadSettings();
-              },
-              isDark: isDark,
-            ),
-          ], isDark),
-          
-          const SizedBox(height: 24),
-          
-          // Reading goals section
-          _buildSectionHeader('Mục tiêu đọc', isDark),
-          _buildSettingCard([
-            _buildSettingItem(
-              icon: Icons.flag_outlined,
-              title: 'Mục tiêu năm',
-              subtitle: '$_readingGoal cuốn sách',
-              onTap: () async {
-                await context.push('/settings/reading-goal');
-                _loadSettings();
-              },
-              isDark: isDark,
-            ),
-            _buildDivider(),
-            _buildSettingItem(
-              icon: Icons.timer_outlined,
-              title: 'Nhắc nhở đọc',
-              subtitle: '${_readingTime.format(context)} mỗi ngày',
-              onTap: () async {
-                await context.push('/settings/reading-reminder');
-                _loadSettings();
-              },
-              isDark: isDark,
-            ),
-          ], isDark),
-          
-          const SizedBox(height: 24),
-          
-          // Flashcard settings
-          _buildSectionHeader('Flashcard', isDark),
-          _buildSettingCard([
-            _buildSettingItem(
-              icon: Icons.style_outlined,
-              title: 'Cài đặt Flashcard',
-              subtitle: '$_cardsPerSession thẻ/phiên • ${_reviewTime.format(context)}',
-              onTap: () async {
-                await context.push('/settings/flashcard');
-                _loadSettings();
-              },
-              isDark: isDark,
-            ),
-          ], isDark),
-          
-          const SizedBox(height: 24),
-          
-          // Data section
-          _buildSectionHeader('Dữ liệu', isDark),
-          _buildSettingCard([
-            _buildSettingItem(
-              icon: Icons.folder_outlined,
-              title: 'Quản lý dữ liệu',
-              subtitle: 'Sao lưu, khôi phục, xuất dữ liệu',
-              onTap: () => context.push('/settings/data'),
-              isDark: isDark,
-            ),
-          ], isDark),
-          
-          const SizedBox(height: 24),
-          
-          // About section
-          _buildSectionHeader('Thông tin', isDark),
-          _buildSettingCard([
-            _buildSettingItem(
-              icon: Icons.info_outline,
-              title: 'Về Trạm Đọc',
-              onTap: () => context.push('/settings/about'),
-              isDark: isDark,
-            ),
-            _buildDivider(),
-            _buildSettingItem(
-              icon: Icons.description_outlined,
-              title: 'Điều khoản sử dụng',
-              onTap: () => context.push('/settings/terms'),
-              isDark: isDark,
-            ),
-            _buildDivider(),
-            _buildSettingItem(
-              icon: Icons.help_outline,
-              title: 'Trợ giúp & Hỗ trợ',
-              onTap: () => context.push('/settings/help'),
-              isDark: isDark,
-            ),
-          ], isDark),
-          
-          const SizedBox(height: 32),
-          
-          // Logout button
-          _buildLogoutButton(context, isDark),
-          
-          const SizedBox(height: 24),
-          
-          // App version
-          Center(
-            child: Text(
-              'Phiên bản 1.0.0',
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+      body:
+          _isLoading
+              ? SafeArea(
+                child: LoadingWidget(
+                  fullScreen: true,
+                  message: S.of(context).t('settings_loading'),
+                ),
+              )
+              : ListView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                children: [
+                  ModernCard(
+                    gradient: AppGradients.warmHero,
+                    elevated: true,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SectionHeader(
+                          title: S.of(context).t('settings_hero_title'),
+                          subtitle:
+                              S.of(context).t('settings_hero_desc'),
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        Wrap(
+                          spacing: AppSpacing.md,
+                          runSpacing: AppSpacing.md,
+                          children: [
+                            _TopStatChip(
+                              icon: Icons.flag_outlined,
+                              label: S.of(context).t('settings_chip_goal'),
+                              value: '$_readingGoal sach',
+                            ),
+                            _TopStatChip(
+                              icon: Icons.language_outlined,
+                              label: S.of(context).t('settings_language'),
+                              value: _language == 'vi' ? S.of(context).t('lang_vi') : S.of(context).t('lang_en'),
+                            ),
+                            _TopStatChip(
+                              icon: Icons.style_outlined,
+                              label: S.of(context).t('search_flashcards'),
+                              value: '$_cardsPerSession the',
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  _buildSectionCard(
+                    title: S.of(context).t('settings_account'),
+                    subtitle: S.of(context).t('settings_account_desc'),
+                    children: [
+                      _SettingsTile(
+                        icon: Icons.person_outline_rounded,
+                        title: S.of(context).t('profile_edit_profile'),
+                        subtitle: S.of(context).t('profile_edit_subtitle'),
+                        onTap: () => context.push('/profile/edit'),
+                      ),
+                      const Divider(height: 1, indent: 68),
+                      _SettingsTile(
+                        icon: Icons.lock_outline_rounded,
+                        title: S.of(context).t('change_pw_title'),
+                        subtitle: S.of(context).t('settings_change_pw_desc'),
+                        onTap: () => context.push('/settings/change-password'),
+                      ),
+                      const Divider(height: 1, indent: 68),
+                      _SettingsTile(
+                        icon: Icons.privacy_tip_outlined,
+                        title: S.of(context).t('privacy_title'),
+                        subtitle: S.of(context).t('settings_privacy_desc'),
+                        onTap: () => context.push('/settings/privacy'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  _buildSectionCard(
+                    title: S.of(context).t('settings_app'),
+                    subtitle: S.of(context).t('settings_app_desc'),
+                    children: [
+                      _SettingsSwitchTile(
+                        icon: Icons.dark_mode_outlined,
+                        title: S.of(context).t('settings_dark_mode'),
+                        subtitle: S.of(context).t('settings_dark_mode_desc'),
+                        value: isDarkMode,
+                        onChanged: (_) => context.read<ThemeCubit>().toggleTheme(),
+                      ),
+                      const Divider(height: 1, indent: 68),
+                      _SettingsTile(
+                        icon: Icons.notifications_outlined,
+                        title: S.of(context).t('notif_title'),
+                        subtitle: S.of(context).t('settings_notif_desc'),
+                        onTap: () => context.push('/settings/notifications'),
+                      ),
+                      const Divider(height: 1, indent: 68),
+                      _SettingsTile(
+                        icon: Icons.language_outlined,
+                        title: S.of(context).t('lang_title'),
+                        subtitle: _language == 'vi' ? S.of(context).t('lang_vi') : S.of(context).t('lang_en'),
+                        onTap: () async {
+                          await context.push('/settings/language');
+                          _loadSettings();
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  _buildSectionCard(
+                    title: S.of(context).t('settings_reading_goal'),
+                    subtitle: S.of(context).t('settings_goal_desc'),
+                    children: [
+                      _SettingsTile(
+                        icon: Icons.flag_circle_outlined,
+                        title: S.of(context).t('goal_yearly'),
+                        subtitle: '$_readingGoal cuon sach',
+                        onTap: () async {
+                          await context.push('/settings/reading-goal');
+                          _loadSettings();
+                        },
+                      ),
+                      const Divider(height: 1, indent: 68),
+                      _SettingsTile(
+                        icon: Icons.schedule_outlined,
+                        title: S.of(context).t('settings_reminder'),
+                        subtitle: '${_readingTime.format(context)} moi ngay',
+                        onTap: () async {
+                          await context.push('/settings/reading-reminder');
+                          _loadSettings();
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  _buildSectionCard(
+                    title: S.of(context).t('settings_learning'),
+                    subtitle: S.of(context).t('settings_learning_desc'),
+                    children: [
+                      _SettingsTile(
+                        icon: Icons.style_outlined,
+                        title: S.of(context).t('fc_settings_title'),
+                        subtitle:
+                            '$_cardsPerSession the moi phien • ${_reviewTime.format(context)}',
+                        onTap: () async {
+                          await context.push('/settings/flashcard');
+                          _loadSettings();
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  _buildSectionCard(
+                    title: S.of(context).t('settings_data_support'),
+                    subtitle: S.of(context).t('settings_data_support_desc'),
+                    children: [
+                      _SettingsTile(
+                        icon: Icons.folder_outlined,
+                        title: S.of(context).t('data_title'),
+                        subtitle: S.of(context).t('settings_data_desc'),
+                        onTap: () => context.push('/settings/data'),
+                      ),
+                      const Divider(height: 1, indent: 68),
+                      _SettingsTile(
+                        icon: Icons.info_outline_rounded,
+                        title: S.of(context).t('settings_about'),
+                        onTap: () => context.push('/settings/about'),
+                      ),
+                      const Divider(height: 1, indent: 68),
+                      _SettingsTile(
+                        icon: Icons.description_outlined,
+                        title: S.of(context).t('terms_title'),
+                        onTap: () => context.push('/settings/terms'),
+                      ),
+                      const Divider(height: 1, indent: 68),
+                      _SettingsTile(
+                        icon: Icons.help_outline_rounded,
+                        title: S.of(context).t('help_title'),
+                        onTap: () => context.push('/settings/help'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  OutlinedButton.icon(
+                    onPressed: () => _confirmLogout(context),
+                    icon: const Icon(
+                      Icons.logout_rounded,
+                      color: AppColors.error,
+                    ),
+                    label: Text(
+                      S.of(context).t('settings_logout'),
+                      style: const TextStyle(color: AppColors.error),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.error),
+                      minimumSize: const Size.fromHeight(56),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  Center(
+                    child: Text(
+                      S.of(context).t('about_version_label'),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ),
-          
-          const SizedBox(height: 40),
-        ],
-      ),
     );
   }
 
-  Widget _buildSectionHeader(String title, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12, left: 4),
-      child: Text(
-        title,
-        style: GoogleFonts.inter(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSettingCard(List<Widget> children, bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: isDark ? [] : [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(children: children),
-    );
-  }
-
-  Widget _buildSettingItem({
-    required IconData icon,
+  Widget _buildSectionCard({
     required String title,
-    String? subtitle,
-    required VoidCallback onTap,
-    required bool isDark,
+    required String subtitle,
+    required List<Widget> children,
   }) {
-    return ListTile(
-      onTap: onTap,
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: AppColors.primaryStart.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(10),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader(title: title, subtitle: subtitle),
+        const SizedBox(height: AppSpacing.lg),
+        ModernCard(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(children: children),
         ),
-        child: Icon(icon, color: AppColors.primaryStart, size: 20),
-      ),
-      title: Text(
-        title,
-        style: GoogleFonts.inter(
-          fontWeight: FontWeight.w500,
-          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-        ),
-      ),
-      subtitle: subtitle != null
-          ? Text(
-              subtitle,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              ),
-            )
-          : null,
-      trailing: Icon(
-        Icons.chevron_right,
-        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-      ),
-    );
-  }
-
-  Widget _buildSwitchItem({
-    required IconData icon,
-    required String title,
-    required bool value,
-    required Function(bool) onChanged,
-    required bool isDark,
-  }) {
-    return ListTile(
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: AppColors.primaryStart.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: AppColors.primaryStart, size: 20),
-      ),
-      title: Text(
-        title,
-        style: GoogleFonts.inter(
-          fontWeight: FontWeight.w500,
-          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-        ),
-      ),
-      trailing: Switch(
-        value: value,
-        onChanged: onChanged,
-        activeColor: AppColors.primaryStart,
-      ),
-    );
-  }
-
-  Widget _buildDivider() {
-    return const Divider(height: 1, indent: 72);
-  }
-
-  Widget _buildLogoutButton(BuildContext context, bool isDark) {
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: OutlinedButton.icon(
-        onPressed: () => _confirmLogout(context),
-        icon: const Icon(Icons.logout, color: AppColors.error),
-        label: Text(
-          'Đăng xuất',
-          style: GoogleFonts.inter(
-            fontWeight: FontWeight.w600,
-            color: AppColors.error,
-          ),
-        ),
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: AppColors.error),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      ),
+      ],
     );
   }
 
   void _confirmLogout(BuildContext context) {
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Đăng xuất'),
-        content: const Text('Bạn có chắc muốn đăng xuất?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
+      builder:
+          (dialogContext) => AlertDialog(
+            title: Text(S.of(context).t('settings_logout')),
+            content: Text(S.of(context).t('settings_logout_confirm')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(S.of(context).t('cancel')),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  context.read<AuthBloc>().add(const AuthLogoutRequested());
+                  context.go('/login');
+                },
+                child: Text(S.of(context).t('settings_logout')),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.read<AuthBloc>().add(const AuthLogoutRequested());
-              context.go('/login');
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Đăng xuất', style: TextStyle(color: Colors.white)),
+    );
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final VoidCallback onTap;
+
+  const _SettingsTile({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+      leading: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: AppColors.primarySoft,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Icon(icon, color: AppColors.primary),
+      ),
+      title: Text(title, style: Theme.of(context).textTheme.titleMedium),
+      subtitle:
+          subtitle == null
+              ? null
+              : Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
+      trailing: const Icon(Icons.chevron_right_rounded),
+    );
+  }
+}
+
+class _SettingsSwitchTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _SettingsSwitchTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      value: value,
+      onChanged: onChanged,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+      secondary: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: AppColors.primarySoft,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Icon(icon, color: AppColors.primary),
+      ),
+      title: Text(title, style: Theme.of(context).textTheme.titleMedium),
+      subtitle: Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+    );
+  }
+}
+
+class _TopStatChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _TopStatChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: AppColors.primary),
+          const SizedBox(width: AppSpacing.sm),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(value, style: Theme.of(context).textTheme.titleMedium),
+              Text(label, style: Theme.of(context).textTheme.bodySmall),
+            ],
           ),
         ],
       ),

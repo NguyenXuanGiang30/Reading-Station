@@ -1,17 +1,32 @@
-/// KeyTakeawaysScreen - Quản lý key points từ sách with API Integration
+/// KeyTakeawaysScreen - Quan ly key takeaways tu sach
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../theme/colors.dart';
 import '../../services/key_takeaway_service.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_durations.dart';
+import '../../theme/app_gradients.dart';
+import '../../theme/app_radius.dart';
+import '../../theme/app_spacing.dart';
+import '../../widgets/common/custom_app_bar.dart';
+import '../../widgets/common/custom_text_field.dart';
+import '../../widgets/common/modern_card.dart';
+import '../../widgets/common/primary_button.dart';
+import '../../widgets/common/section_container.dart';
+import '../../widgets/common/section_header.dart';
+import '../../widgets/data/status_chip.dart';
+import '../../widgets/states/empty_state_widget.dart';
+import '../../widgets/states/error_state_widget.dart';
+import '../../widgets/states/loading_widget.dart';
+import '../../l10n/app_localizations.dart';
 
 class KeyTakeawaysScreen extends StatefulWidget {
   final String bookId;
   final String? bookTitle;
-  
+
   const KeyTakeawaysScreen({super.key, required this.bookId, this.bookTitle});
 
   @override
@@ -20,12 +35,12 @@ class KeyTakeawaysScreen extends StatefulWidget {
 
 class _KeyTakeawaysScreenState extends State<KeyTakeawaysScreen> {
   final KeyTakeawayService _service = KeyTakeawayService();
+  final TextEditingController _newTakeawayController = TextEditingController();
+
   List<Map<String, dynamic>> _takeaways = [];
   bool _isLoading = true;
   bool _isSaving = false;
   String? _error;
-  
-  final _newTakeawayController = TextEditingController();
   bool _isAdding = false;
 
   @override
@@ -48,51 +63,44 @@ class _KeyTakeawaysScreenState extends State<KeyTakeawaysScreen> {
 
     try {
       final data = await _service.getKeyTakeaways(widget.bookId);
-      if (mounted) {
-        setState(() {
-          _takeaways = data.map((e) => e as Map<String, dynamic>).toList();
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _takeaways = data.map((e) => e as Map<String, dynamic>).toList();
+        _isLoading = false;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
     }
   }
 
   Future<void> _addTakeaway() async {
-    if (_newTakeawayController.text.trim().isEmpty) return;
-    
+    final content = _newTakeawayController.text.trim();
+    if (content.isEmpty) return;
+
     setState(() => _isSaving = true);
-    
+
     try {
       final result = await _service.createKeyTakeaway(
         userBookId: widget.bookId,
-        content: _newTakeawayController.text.trim(),
+        content: content,
       );
-      
-      if (mounted && result != null) {
-        setState(() {
-          _takeaways.add(result);
-          _newTakeawayController.clear();
-          _isAdding = false;
-          _isSaving = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã thêm takeaway'), backgroundColor: AppColors.success),
-        );
-      }
+
+      if (!mounted || result == null) return;
+      setState(() {
+        _takeaways = [..._takeaways, result];
+        _newTakeawayController.clear();
+        _isAdding = false;
+        _isSaving = false;
+      });
+      _showSnackBar(S.of(context).t('takeaway_added_msg'));
     } catch (e) {
-      if (mounted) {
-        setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: $e'), backgroundColor: AppColors.error),
-        );
-      }
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      _showSnackBar('Loi: $e');
     }
   }
 
@@ -100,28 +108,20 @@ class _KeyTakeawaysScreenState extends State<KeyTakeawaysScreen> {
     final takeaway = _takeaways[index];
     final id = takeaway['id']?.toString();
     if (id == null) return;
-    
-    // Optimistic delete
+
     final removed = _takeaways.removeAt(index);
     setState(() {});
-    
+
     try {
       await _service.deleteKeyTakeaway(id);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã xóa takeaway')),
-        );
-      }
+      if (!mounted) return;
+      _showSnackBar(S.of(context).t('takeaway_deleted_msg'));
     } catch (e) {
-      // Rollback on error
-      if (mounted) {
-        setState(() {
-          _takeaways.insert(index, removed);
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không thể xóa: $e'), backgroundColor: AppColors.error),
-        );
-      }
+      if (!mounted) return;
+      setState(() {
+        _takeaways.insert(index, removed);
+      });
+      _showSnackBar('${S.of(context).t("error_delete")}: $e');
     }
   }
 
@@ -129,334 +129,442 @@ class _KeyTakeawaysScreenState extends State<KeyTakeawaysScreen> {
     if (oldIndex < newIndex) {
       newIndex -= 1;
     }
-    
+
     final item = _takeaways.removeAt(oldIndex);
     _takeaways.insert(newIndex, item);
     setState(() {});
-    
-    // Save reorder to API
+
     try {
-      final ids = _takeaways.map((t) => t['id']?.toString() ?? '').toList();
+      final ids = _takeaways
+          .map((item) => item['id']?.toString() ?? '')
+          .toList();
       await _service.reorderTakeaways(ids);
-    } catch (e) {
-      // Ignore reorder errors for now
-    }
+    } catch (_) {}
   }
 
   Future<void> _createFlashcard(int index) async {
     final takeaway = _takeaways[index];
     final id = takeaway['id']?.toString();
     if (id == null) return;
-    
+
     try {
       await _service.createFlashcardFromTakeaway(id);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã tạo flashcard từ takeaway'), backgroundColor: AppColors.success),
-        );
-      }
+      if (!mounted) return;
+      _showSnackBar(S.of(context).t('takeaway_fc_created'));
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: $e'), backgroundColor: AppColors.error),
-        );
-      }
+      if (!mounted) return;
+      _showSnackBar('Loi: $e');
     }
+  }
+
+  Future<void> _copyAllTakeaways() async {
+    final content = _exportText;
+    if (content.isEmpty) {
+      _showSnackBar(S.of(context).t('takeaway_copy_empty'));
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: content));
+    if (!mounted) return;
+    _showSnackBar(S.of(context).t('takeaway_copied'));
+  }
+
+  String get _exportText {
+    if (_takeaways.isEmpty) return '';
+    return _takeaways
+        .asMap()
+        .entries
+        .map((entry) => '${entry.key + 1}. ${entry.value['content'] ?? ''}')
+        .join('\n');
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Key Takeaways',
-          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
-        ),
+      appBar: CustomAppBar(
+        title: S.of(context).t('takeaway_title'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.share),
             onPressed: _showExportOptions,
+            icon: const Icon(Icons.ios_share_rounded),
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primaryStart))
-          : _error != null
-              ? _buildErrorState()
-              : RefreshIndicator(
-                  onRefresh: _loadTakeaways,
-                  color: AppColors.primaryStart,
-                  child: Column(
-                    children: [
-                      // Book info header
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: const BoxDecoration(
-                          gradient: AppColors.primaryGradient,
-                        ),
-                        child: Column(
-                          children: [
-                            const Icon(Icons.menu_book, color: Colors.white, size: 40),
-                            const SizedBox(height: 12),
-                            Text(
-                              widget.bookTitle ?? 'Sách',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '${_takeaways.length} điểm chính',
-                              style: GoogleFonts.plusJakartaSans(
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      
-                      // Takeaways list
-                      Expanded(
-                        child: _takeaways.isEmpty && !_isAdding
-                            ? _buildEmptyState(isDark)
-                            : ReorderableListView.builder(
-                                padding: const EdgeInsets.all(20),
-                                itemCount: _takeaways.length + (_isAdding ? 1 : 0),
-                                onReorder: _reorderTakeaways,
-                                itemBuilder: (context, index) {
-                                  if (_isAdding && index == _takeaways.length) {
-                                    return _buildAddInput(isDark, key: const ValueKey('add_input'));
-                                  }
-                                  return _buildTakeawayCard(index, isDark, key: ValueKey(_takeaways[index]['id']));
-                                },
-                              ),
-                      ),
-                    ],
-                  ),
-                ),
       floatingActionButton: !_isAdding && !_isLoading && _error == null
           ? FloatingActionButton.extended(
               onPressed: () => setState(() => _isAdding = true),
-              backgroundColor: AppColors.primaryStart,
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: Text(
-                'Thêm takeaway',
-                style: GoogleFonts.plusJakartaSans(color: Colors.white, fontWeight: FontWeight.w600),
-              ),
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add_rounded),
+              label: Text(S.of(context).t('takeaway_add')),
             )
           : null,
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline, size: 64, color: AppColors.error),
-          const SizedBox(height: 16),
-          Text(_error ?? 'Đã xảy ra lỗi'),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _loadTakeaways,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Thử lại'),
-          ),
-        ],
+      body: AnimatedSwitcher(
+        duration: AppDurations.page,
+        switchInCurve: AppDurations.emphasized,
+        switchOutCurve: Curves.easeInOut,
+        child: _buildBody(),
       ),
     );
   }
 
-  Widget _buildEmptyState(bool isDark) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.lightbulb_outline,
-            size: 80,
-            color: Colors.grey.shade400,
+  Widget _buildBody() {
+    if (_isLoading) {
+      return SafeArea(
+        key: const ValueKey('loading'),
+        child: LoadingWidget(fullScreen: true, message: S.of(context).t('takeaway_loading_msg')),
+      );
+    }
+
+    if (_error != null) {
+      return SafeArea(
+        key: const ValueKey('error'),
+        child: ErrorStateWidget(message: _error!, onRetry: _loadTakeaways),
+      );
+    }
+
+    return Column(
+      key: const ValueKey('content'),
+      children: [
+        _buildHeroHeader(),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadTakeaways,
+            child: _buildTakeawayContent(),
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Chưa có takeaway nào',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Thêm những điểm chính bạn học được từ sách',
-            style: GoogleFonts.plusJakartaSans(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildTakeawayCard(int index, bool isDark, {required Key key}) {
-    final takeaway = _takeaways[index];
-    
+  Widget _buildHeroHeader() {
     return Container(
-      key: key,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: isDark ? [] : [
-          BoxShadow(
-            color: AppColors.shadowLight,
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+      width: double.infinity,
+      decoration: const BoxDecoration(gradient: AppGradients.warmHero),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.bookTitle ?? S.of(context).t('takeaway_current_book'),
+                          style: Theme.of(context).textTheme.headlineLarge,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          S.of(context).t('takeaway_hero_desc'),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.lg),
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      gradient: AppColors.primaryGradient,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.22),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.lightbulb_rounded,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              Row(
+                children: [
+                  Expanded(
+                    child: _HeroMetric(
+                      value: '${_takeaways.length}',
+                      label: S.of(context).t('takeaway_count_label'),
+                      icon: Icons.format_list_bulleted_rounded,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: _HeroMetric(
+                      value:
+                          '${_takeaways.where((item) => item['pageNumber'] != null).length}',
+                      label: S.of(context).t('takeaway_with_page'),
+                      icon: Icons.bookmark_added_outlined,
+                      color: AppColors.secondary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
+        ),
       ),
-      child: Row(
+    );
+  }
+
+  Widget _buildTakeawayContent() {
+    if (_takeaways.isEmpty) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+        children: [
+          AnimatedSwitcher(
+            duration: AppDurations.standard,
+            child: _isAdding
+                ? _buildAddInput()
+                : EmptyStateWidget(
+                    title: S.of(context).t('takeaway_empty_title'),
+                    message:
+                        S.of(context).t('takeaway_empty_msg'),
+                    icon: Icons.lightbulb_outline_rounded,
+                  ),
+          ),
+          if (!_isAdding) ...[
+            const SizedBox(height: AppSpacing.xl),
+            PrimaryButton(
+              label: S.of(context).t('takeaway_add_first'),
+              icon: const Icon(
+                Icons.add_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
+              onPressed: () => setState(() => _isAdding = true),
+            ),
+          ],
+        ],
+      );
+    }
+
+    return ReorderableListView.builder(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+      onReorder: _reorderTakeaways,
+      itemCount: _takeaways.length,
+      proxyDecorator: (child, index, animation) {
+        return AnimatedBuilder(
+          animation: animation,
+          builder: (context, _) {
+            return Transform.scale(
+              scale: 1 + (animation.value * 0.02),
+              child: Material(color: Colors.transparent, child: child),
+            );
+          },
+        );
+      },
+      header: _isAdding
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+              child: _buildAddInput(),
+            )
+          : const SizedBox.shrink(),
+      itemBuilder: (context, index) {
+        return Padding(
+          key: ValueKey(_takeaways[index]['id'] ?? 'takeaway_$index'),
+          padding: EdgeInsets.only(
+            bottom: index == _takeaways.length - 1 ? 0 : AppSpacing.md,
+          ),
+          child: _buildTakeawayCard(index),
+        );
+      },
+    );
+  }
+
+  Widget _buildTakeawayCard(int index) {
+    final takeaway = _takeaways[index];
+    final pageNumber = takeaway['pageNumber'];
+
+    return ModernCard(
+      elevated: true,
+      padding: const EdgeInsets.all(16),
+      border: Border.all(
+        color: index == 0
+            ? AppColors.primary.withValues(alpha: 0.16)
+            : AppColors.border,
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Number badge
-          Container(
-            width: 28,
-            height: 28,
-            decoration: const BoxDecoration(
-              gradient: AppColors.primaryGradient,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                '${index + 1}',
-                style: GoogleFonts.plusJakartaSans(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  gradient: index.isEven
+                      ? AppColors.primaryGradient
+                      : AppColors.accentGradient,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child: Text(
+                    '${index + 1}',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelLarge?.copyWith(color: Colors.white),
+                  ),
                 ),
               ),
-            ),
-          ),
-          
-          const SizedBox(width: 12),
-          
-          // Content
-          Expanded(
-            child: Text(
-              (takeaway['content'] ?? '') as String,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                height: 1.5,
-                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-              ),
-            ),
-          ),
-          
-          // Actions
-          PopupMenuButton<String>(
-            icon: Icon(
-              Icons.more_vert,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-            ),
-            onSelected: (value) {
-              if (value == 'delete') {
-                _deleteTakeaway(index);
-              } else if (value == 'flashcard') {
-                _createFlashcard(index);
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'flashcard',
-                child: Row(
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
                   children: [
-                    Icon(Icons.style),
-                    SizedBox(width: 8),
-                    Text('Tạo flashcard'),
+                    StatusChip(
+                      label: 'Takeaway ${index + 1}',
+                      color: AppColors.primary,
+                      icon: Icons.auto_awesome_rounded,
+                    ),
+                    if (pageNumber != null)
+                      StatusChip(
+                        label: 'Trang $pageNumber',
+                        color: AppColors.secondary,
+                        icon: Icons.book_outlined,
+                      ),
                   ],
                 ),
               ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete, color: AppColors.error),
-                    SizedBox(width: 8),
-                    Text('Xóa', style: TextStyle(color: AppColors.error)),
-                  ],
+              PopupMenuButton<_TakeawayAction>(
+                onSelected: (action) {
+                  if (action == _TakeawayAction.createFlashcard) {
+                    _createFlashcard(index);
+                  } else {
+                    _deleteTakeaway(index);
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem<_TakeawayAction>(
+                    value: _TakeawayAction.createFlashcard,
+                    child: Text(S.of(context).t('takeaway_create_fc')),
+                  ),
+                  PopupMenuItem<_TakeawayAction>(
+                    value: _TakeawayAction.delete,
+                    child: Text(S.of(context).t('takeaway_delete_item')),
+                  ),
+                ],
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              ReorderableDragStartListener(
+                index: index,
+                child: const Icon(
+                  Icons.drag_indicator_rounded,
+                  color: AppColors.textSecondary,
                 ),
               ),
             ],
           ),
-          
-          // Drag handle
-          ReorderableDragStartListener(
-            index: index,
-            child: const Icon(Icons.drag_handle, color: Colors.grey),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            '${takeaway['content'] ?? ''}',
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: () => _createFlashcard(index),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 44),
+                  backgroundColor: AppColors.primarySoft,
+                  foregroundColor: AppColors.primary,
+                ),
+                icon: const Icon(Icons.style_rounded, size: 18),
+                label: Text(S.of(context).t('takeaway_create_fc')),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _deleteTakeaway(index),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.error),
+                  minimumSize: const Size(0, 44),
+                ),
+                icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                label: Text(S.of(context).t('takeaway_delete')),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildAddInput(bool isDark, {required Key key}) {
-    return Container(
-      key: key,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.primaryStart),
-      ),
+  Widget _buildAddInput() {
+    return SectionContainer(
+      padding: const EdgeInsets.all(20),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextField(
-            controller: _newTakeawayController,
-            autofocus: true,
-            maxLines: 3,
-            decoration: InputDecoration(
-              hintText: 'Nhập điểm chính mới...',
-              border: InputBorder.none,
-              hintStyle: GoogleFonts.plusJakartaSans(color: Colors.grey),
-            ),
+          SectionHeader(
+            title: S.of(context).t('takeaway_add_new'),
+            subtitle:
+                S.of(context).t('takeaway_add_desc'),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.xl),
+          CustomTextField(
+            controller: _newTakeawayController,
+            label: S.of(context).t('takeaway_content_label'),
+            hint: S.of(context).t('takeaway_content_hint'),
+            maxLines: 5,
+            textCapitalization: TextCapitalization.sentences,
+            prefix: const Icon(Icons.edit_note_rounded),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            S.of(context).t('takeaway_tip'),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.xl),
           Row(
-            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              TextButton(
-                onPressed: _isSaving ? null : () {
-                  setState(() {
-                    _isAdding = false;
-                    _newTakeawayController.clear();
-                  });
-                },
-                child: const Text('Hủy'),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: _isSaving ? null : _addTakeaway,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryStart,
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _isSaving
+                      ? null
+                      : () {
+                          setState(() {
+                            _isAdding = false;
+                            _newTakeawayController.clear();
+                          });
+                        },
+                  child: Text(S.of(context).t('takeaway_cancel')),
                 ),
-                child: _isSaving
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : Text(
-                        'Thêm',
-                        style: GoogleFonts.plusJakartaSans(color: Colors.white),
-                      ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: PrimaryButton(
+                  label: S.of(context).t('takeaway_save_item'),
+                  loading: _isSaving,
+                  onPressed: _addTakeaway,
+                ),
               ),
             ],
           ),
@@ -466,46 +574,144 @@ class _KeyTakeawaysScreenState extends State<KeyTakeawaysScreen> {
   }
 
   void _showExportOptions() {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
+      builder: (bottomSheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'Xuất Takeaways',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 24),
-            ListTile(
-              leading: const Icon(Icons.copy),
-              title: const Text('Sao chép'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Đã sao chép vào clipboard')),
-                );
+            _ExportTile(
+              icon: Icons.copy_rounded,
+              title: S.of(context).t('takeaway_export_copy'),
+              subtitle: S.of(context).t('takeaway_export_copy_sub'),
+              onTap: () async {
+                Navigator.pop(bottomSheetContext);
+                await _copyAllTakeaways();
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.share),
-              title: const Text('Chia sẻ'),
-              onTap: () => Navigator.pop(context),
+            const SizedBox(height: AppSpacing.sm),
+            _ExportTile(
+              icon: Icons.share_rounded,
+              title: S.of(context).t('takeaway_export_share'),
+              subtitle: S.of(context).t('takeaway_export_share_sub'),
+              onTap: () {
+                Navigator.pop(bottomSheetContext);
+                _showSnackBar(S.of(context).t('takeaway_share_coming'));
+              },
             ),
-            ListTile(
-              leading: const Icon(Icons.picture_as_pdf),
-              title: const Text('Xuất PDF'),
-              onTap: () => Navigator.pop(context),
+            const SizedBox(height: AppSpacing.sm),
+            _ExportTile(
+              icon: Icons.picture_as_pdf_outlined,
+              title: S.of(context).t('takeaway_export_pdf'),
+              subtitle: S.of(context).t('takeaway_export_pdf_sub'),
+              onTap: () {
+                Navigator.pop(bottomSheetContext);
+                _showSnackBar(S.of(context).t('takeaway_pdf_coming'));
+              },
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+enum _TakeawayAction { createFlashcard, delete }
+
+class _HeroMetric extends StatelessWidget {
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  const _HeroMetric({
+    required this.value,
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ModernCard(
+      gradient: LinearGradient(
+        colors: [
+          Colors.white.withValues(alpha: 0.92),
+          Colors.white.withValues(alpha: 0.82),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: Icon(icon, color: color),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(value, style: Theme.of(context).textTheme.headlineMedium),
+                const SizedBox(height: AppSpacing.xs),
+                Text(label, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExportTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _ExportTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ModernCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.primarySoft,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: Icon(icon, color: AppColors.primary),
+          ),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: AppSpacing.xs),
+                Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded),
+        ],
       ),
     );
   }

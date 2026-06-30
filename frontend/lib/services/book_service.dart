@@ -4,6 +4,7 @@ library;
 import 'package:dio/dio.dart';
 import '../models/book.dart';
 import 'api_service.dart';
+import '../exceptions/app_exception.dart';
 
 class BookService {
   final ApiService _api = ApiService();  
@@ -39,6 +40,8 @@ class BookService {
         return content.map((json) => Book.fromJson(json)).toList();
       }
       return [];
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể tải danh sách sách: $e');
     }
@@ -52,6 +55,8 @@ class BookService {
         return Book.fromJson(response.data);
       }
       return null;
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể tải thông tin sách: $e');
     }
@@ -65,16 +70,17 @@ class BookService {
       if (response.data != null) {
         return {
           ...response.data,
+          'totalPages': response.data['pageCount'],
+          'coverUrl': response.data['coverImageUrl'],
           'found': true,
         };
       }
+    } on AppException catch (e) {
+      // Don't rethrow here so we can proceed to fallbacks
+      print('BookService: backend ISBN lookup failed (${e.statusCode}), falling back to external API: ${e.message}');
     } catch (e) {
       // If backend returns 404, it means it's not found in DB nor Google Books (via backend)
-      if (e is DioException && e.response?.statusCode == 404) {
-        return null;
-      }
-      // If other error (e.g. connection), fall back to public Google Books API below
-      print('Backend lookup failed: $e, falling back to direct Google Books API');
+      print('BookService: backend ISBN lookup failed, falling back to external API: $e');
     }
     
     // Fallback to direct Google Books API (public, limited quota)
@@ -105,7 +111,37 @@ class BookService {
         }
       }
     } catch (e) {
-      print('Google Books direct lookup failed: $e');
+      print('BookService: external Google Books API failed: $e');
+    }
+
+    // Fallback to Open Library API
+    try {
+      final openLibDio = Dio();
+      final openLibResponse = await openLibDio.get(
+        'https://openlibrary.org/api/books',
+        queryParameters: {
+          'bibkeys': 'ISBN:$isbn',
+          'format': 'json',
+          'jscmd': 'data'
+        },
+      );
+      
+      if (openLibResponse.data != null && openLibResponse.data['ISBN:$isbn'] != null) {
+        final bookData = openLibResponse.data['ISBN:$isbn'];
+        return {
+          'title': bookData['title'] ?? '',
+          'author': (bookData['authors'] as List?)?.map((a) => a['name']).join(', ') ?? '',
+          'publisher': (bookData['publishers'] as List?)?.map((p) => p['name']).join(', ') ?? '',
+          'description': bookData['notes'] ?? '',
+          'coverUrl': bookData['cover']?['large'] ?? bookData['cover']?['medium'] ?? '',
+          'totalPages': bookData['number_of_pages'] ?? 0,
+          'isbn': isbn,
+          'category': (bookData['subjects'] as List?)?.firstOrNull?['name'] ?? '',
+          'found': true,
+        };
+      }
+    } catch (e) {
+      print('BookService: direct Open Library lookup failed: $e');
     }
     
     return null;
@@ -142,6 +178,8 @@ class BookService {
         return Book.fromJson(response.data);
       }
       return null;
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể thêm sách: $e');
     }
@@ -178,6 +216,8 @@ class BookService {
         return Book.fromJson(response.data);
       }
       return null;
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể cập nhật sách: $e');
     }
@@ -190,6 +230,8 @@ class BookService {
         'currentPage': currentPage,
       });
       return true;
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể cập nhật tiến độ: $e');
     }
@@ -200,6 +242,8 @@ class BookService {
     try {
       await _api.delete('/books/$id');
       return true;
+    } on AppException {
+      rethrow;
     } catch (e) {
       throw Exception('Không thể xóa sách: $e');
     }
@@ -210,6 +254,8 @@ class BookService {
     try {
       final response = await _api.get('/books/statistics');
       return response.data ?? {};
+    } on AppException {
+      rethrow;
     } catch (e) {
       return {};
     }

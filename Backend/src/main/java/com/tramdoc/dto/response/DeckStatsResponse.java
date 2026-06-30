@@ -10,7 +10,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class DeckStatsResponse {
+    private Long bookId;
     private String deckName;
+    private String bookCoverUrl;
     private Long totalCards;
     private Long dueCards;
     private Long masteredCards;

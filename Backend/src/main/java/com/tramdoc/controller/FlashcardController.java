@@ -1,6 +1,7 @@
 package com.tramdoc.controller;
 
 import com.tramdoc.dto.request.CreateFlashcardRequest;
+import com.tramdoc.dto.request.UpdateFlashcardRequest;
 import com.tramdoc.dto.request.ReviewFlashcardRequest;
 import com.tramdoc.dto.response.DeckStatsResponse;
 import com.tramdoc.dto.response.FlashcardResponse;
@@ -65,6 +66,20 @@ public class FlashcardController {
             @Valid @RequestBody ReviewFlashcardRequest request) {
         FlashcardResponse flashcard = flashcardService.reviewFlashcard(flashcardId, request);
         return ResponseEntity.ok(flashcard);
+    }
+    
+    @PutMapping("/{flashcardId}")
+    public ResponseEntity<FlashcardResponse> updateFlashcard(
+            @PathVariable Long flashcardId,
+            @RequestBody UpdateFlashcardRequest request) {
+        FlashcardResponse flashcard = flashcardService.updateFlashcard(flashcardId, request);
+        return ResponseEntity.ok(flashcard);
+    }
+    
+    @DeleteMapping("/{flashcardId}")
+    public ResponseEntity<Void> deleteFlashcard(@PathVariable Long flashcardId) {
+        flashcardService.deleteFlashcard(flashcardId);
+        return ResponseEntity.noContent().build();
     }
     
     @GetMapping("/stats")

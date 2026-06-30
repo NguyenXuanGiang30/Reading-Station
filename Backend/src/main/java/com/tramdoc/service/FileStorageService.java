@@ -1,5 +1,6 @@
 package com.tramdoc.service;
 
+import com.tramdoc.config.AppProperties;
 import com.tramdoc.exception.BadRequestException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -12,15 +13,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class FileStorageService {
 
     private final Path fileStorageLocation;
+    private final AppProperties appProperties;
 
-    public FileStorageService() {
-        this.fileStorageLocation = Paths.get("uploads").toAbsolutePath().normalize();
+    public FileStorageService(AppProperties appProperties) {
+        this.appProperties = appProperties;
+        this.fileStorageLocation = Paths.get(appProperties.getStorage().getLocalDirectory()).toAbsolutePath().normalize();
 
         try {
             Files.createDirectories(this.fileStorageLocation);
@@ -30,6 +36,8 @@ public class FileStorageService {
     }
 
     public String storeFile(MultipartFile file) {
+        validateFile(file);
+
         // Normalize file name
         String originalFileName = StringUtils.cleanPath(file.getOriginalFilename());
 
@@ -43,12 +51,15 @@ public class FileStorageService {
 
         try {
             // Check if the file's name contains invalid characters
-            if (fileName.contains("..")) {
+            if (originalFileName.contains("..")) {
                 throw new BadRequestException("Sorry! Filename contains invalid path sequence " + fileName);
             }
 
             // Copy file to the target location (Replacing existing file with the same name)
             Path targetLocation = this.fileStorageLocation.resolve(fileName);
+            if (!targetLocation.normalize().startsWith(fileStorageLocation)) {
+                throw new BadRequestException("Invalid target file path");
+            }
             try (InputStream inputStream = file.getInputStream()) {
                 Files.copy(inputStream, targetLocation, StandardCopyOption.REPLACE_EXISTING);
             }
@@ -63,6 +74,33 @@ public class FileStorageService {
 
         } catch (IOException ex) {
             throw new RuntimeException("Could not store file " + fileName + ". Please try again!", ex);
+        }
+    }
+
+    private void validateFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("File khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng");
+        }
+
+        if (file.getSize() > appProperties.getStorage().getMaxFileSizeBytes()) {
+            throw new BadRequestException("File vÆ°á»£t quÃ¡ kÃ­ch thÆ°á»›c cho phÃ©p");
+        }
+
+        String originalFileName = StringUtils.cleanPath(file.getOriginalFilename());
+        if (!StringUtils.hasText(originalFileName)) {
+            throw new BadRequestException("TÃªn file khÃ´ng há»£p lá»‡");
+        }
+
+        String contentType = file.getContentType();
+        if (!StringUtils.hasText(contentType)) {
+            throw new BadRequestException("KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c loáº¡i file");
+        }
+
+        Set<String> allowedContentTypes = appProperties.getStorage().getAllowedContentTypes().stream()
+                .map(type -> type.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+        if (!allowedContentTypes.contains(contentType.toLowerCase(Locale.ROOT))) {
+            throw new BadRequestException("Loáº¡i file khÃ´ng Ä‘Æ°á»£c há»— trá»£");
         }
     }
 }

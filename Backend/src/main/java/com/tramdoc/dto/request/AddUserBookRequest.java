@@ -1,15 +1,26 @@
 package com.tramdoc.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.tramdoc.entity.UserBook.BookStatus;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
 public class AddUserBookRequest {
-    @NotNull(message = "Book ID không được để trống")
     private Long bookId;
-    
+    private String isbn;
+    private String title;
+    private String author;
+
+    @JsonAlias("coverImageUrl")
+    private String coverUrl;
+
+    @JsonAlias("pageCount")
+    private Integer totalPages;
+
+    private String description;
+    private String category;
+    private String publisher;
+    private Integer publishYear;
     private BookStatus status = BookStatus.WANT_TO_READ;
-    
-    private String location; // Vị trí sách giấy
+    private String location;
 }

@@ -1,11 +1,19 @@
-/// HelpSupportScreen - Trợ giúp và hỗ trợ
+/// HelpSupportScreen - Tro giup va ho tro
 library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../theme/colors.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_gradients.dart';
+import '../../theme/app_radius.dart';
+import '../../theme/app_spacing.dart';
+import '../../widgets/common/custom_app_bar.dart';
+import '../../widgets/common/modern_card.dart';
+import '../../widgets/common/section_header.dart';
+import '../../widgets/settings/settings_section_card.dart';
+import '../../widgets/settings/settings_tile.dart';
+import '../../l10n/app_localizations.dart';
 
 class HelpSupportScreen extends StatefulWidget {
   const HelpSupportScreen({super.key});
@@ -15,374 +23,215 @@ class HelpSupportScreen extends StatefulWidget {
 }
 
 class _HelpSupportScreenState extends State<HelpSupportScreen> {
-  final List<Map<String, dynamic>> _faqs = [
-    {
-      'question': 'Làm thế nào để thêm sách mới?',
-      'answer': 'Bạn có thể thêm sách bằng cách:\n• Quét mã barcode/ISBN trên bìa sách\n• Nhấn nút "+" và nhập thông tin thủ công\n• Tìm kiếm sách trong thư viện online',
-      'expanded': false,
-    },
-    {
-      'question': 'Flashcard hoạt động như thế nào?',
-      'answer': 'Flashcard sử dụng phương pháp Spaced Repetition (Lặp lại ngắt quãng). Hệ thống sẽ tự động lên lịch ôn tập dựa trên mức độ ghi nhớ của bạn để tối ưu hóa việc học.',
-      'expanded': false,
-    },
-    {
-      'question': 'Làm sao để sử dụng OCR?',
-      'answer': 'Từ màn hình chi tiết sách, nhấn vào biểu tượng camera để chụp ảnh trang sách. Ứng dụng sẽ tự động nhận dạng văn bản và cho phép bạn lưu thành ghi chú hoặc flashcard.',
-      'expanded': false,
-    },
-    {
-      'question': 'Dữ liệu của tôi có an toàn không?',
-      'answer': 'Có! Dữ liệu của bạn được mã hóa và lưu trữ an toàn. Bạn cũng có thể sao lưu dữ liệu định kỳ trong phần Cài đặt > Quản lý dữ liệu.',
-      'expanded': false,
-    },
-    {
-      'question': 'Làm sao để kết nối với bạn bè?',
-      'answer': 'Vào tab Xã hội, nhấn vào biểu tượng tìm kiếm để tìm bạn bè theo email hoặc tên người dùng. Bạn cũng có thể chia sẻ mã QR cá nhân để người khác thêm bạn.',
-      'expanded': false,
-    },
-    {
-      'question': 'Focus Mode là gì?',
-      'answer': 'Focus Mode giúp bạn tập trung đọc sách bằng cách đếm thời gian và chặn các thông báo gây xao nhãng. Thời gian đọc sẽ được ghi lại vào tiến độ của bạn.',
-      'expanded': false,
-    },
-    {
-      'question': 'Làm sao để đặt mục tiêu đọc sách?',
-      'answer': 'Vào Cài đặt > Mục tiêu đọc để đặt số sách bạn muốn đọc trong năm. Ứng dụng sẽ theo dõi tiến độ và nhắc nhở bạn.',
-      'expanded': false,
-    },
-  ];
+  final List<bool> _expanded = [false, false, false, false, false];
+
+  List<Map<String, dynamic>> _buildFaqs(BuildContext context) {
+    return [
+      {
+        'question': S.of(context).t('help_faq1_q'),
+        'answer': S.of(context).t('help_faq1_a'),
+        'expanded': _expanded[0],
+      },
+      {
+        'question': S.of(context).t('help_faq2_q'),
+        'answer': S.of(context).t('help_faq2_a'),
+        'expanded': _expanded[1],
+      },
+      {
+        'question': S.of(context).t('help_faq3_q'),
+        'answer': S.of(context).t('help_faq3_a'),
+        'expanded': _expanded[2],
+      },
+      {
+        'question': S.of(context).t('help_faq4_q'),
+        'answer': S.of(context).t('help_faq4_a'),
+        'expanded': _expanded[3],
+      },
+      {
+        'question': S.of(context).t('help_faq5_q'),
+        'answer': S.of(context).t('help_faq5_a'),
+        'expanded': _expanded[4],
+      },
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
+    final _faqs = _buildFaqs(context);
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Trợ giúp & Hỗ trợ',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-        ),
+      appBar: CustomAppBar(
+        title: S.of(context).t('help_title'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          // Quick help
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppColors.primaryStart, AppColors.primaryEnd],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          children: [
+            _buildHeroCard(),
+            const SizedBox(height: AppSpacing.xl),
+            SettingsSectionCard(
+              title: S.of(context).t('help_contact_section'),
+              subtitle:
+                  S.of(context).t('help_contact_desc'),
               children: [
-                const Icon(Icons.support_agent, size: 48, color: Colors.white),
-                const SizedBox(height: 12),
-                Text(
-                  'Bạn cần trợ giúp?',
-                  style: GoogleFonts.inter(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                SettingsTile(
+                  icon: Icons.email_outlined,
+                  title: S.of(context).t('help_email'),
+                  subtitle: 'support@tramdoc.app',
+                  onTap: () => _showSupportMessage(
+                    S.of(context).t('help_email_msg'),
                   ),
                 ),
-                const SizedBox(height: 8),
+                SettingsTile(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  title: S.of(context).t('help_chat'),
+                  subtitle: S.of(context).t('help_chat_hours'),
+                  onTap: () => _showSupportMessage(
+                    S.of(context).t('help_chat_coming'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            SectionHeader(
+              title: S.of(context).t('help_faq'),
+              subtitle:
+                  S.of(context).t('help_faq_desc'),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            ...List.generate(_faqs.length, (index) {
+              final faq = _faqs[index];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                child: ModernCard(
+                  padding: EdgeInsets.zero,
+                  child: Theme(
+                    data: Theme.of(
+                      context,
+                    ).copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      initiallyExpanded: faq['expanded'] as bool,
+                      onExpansionChanged: (expanded) =>
+                          setState(() => _expanded[index] = expanded),
+                      tilePadding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                        vertical: AppSpacing.sm,
+                      ),
+                      childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      leading: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: AppColors.primarySoft,
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${index + 1}',
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(color: AppColors.primary),
+                          ),
+                        ),
+                      ),
+                      title: Text(
+                        '${faq['question']}',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      children: [
+                        Text(
+                          '${faq['answer']}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+            const SizedBox(height: AppSpacing.xl),
+            SettingsSectionCard(
+              title: S.of(context).t('help_docs'),
+              subtitle:
+                  S.of(context).t('help_docs_desc'),
+              children: [
+                SettingsTile(
+                  icon: Icons.book_outlined,
+                  title: S.of(context).t('help_guide'),
+                  subtitle: S.of(context).t('help_guide_desc'),
+                  onTap: () =>
+                      _showSupportMessage(S.of(context).t('help_coming_soon')),
+                ),
+                SettingsTile(
+                  icon: Icons.play_circle_outline_rounded,
+                  title: S.of(context).t('help_video'),
+                  subtitle: S.of(context).t('help_video_desc'),
+                  onTap: () =>
+                      _showSupportMessage(S.of(context).t('help_coming_soon')),
+                ),
+                SettingsTile(
+                  icon: Icons.update_rounded,
+                  title: S.of(context).t('help_changelog'),
+                  subtitle: S.of(context).t('help_changelog_desc'),
+                  onTap: () =>
+                      _showSupportMessage(S.of(context).t('help_coming_soon')),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroCard() {
+    return ModernCard(
+      gradient: AppGradients.warmHero,
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.90),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.support_agent_rounded,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  'Chúng tôi luôn sẵn sàng hỗ trợ bạn',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: Colors.white.withValues(alpha: 0.9),
+                  S.of(context).t('help_hero_title'),
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  S.of(context).t('help_hero_desc'),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
             ),
           ),
-
-          const SizedBox(height: 24),
-
-          // Contact options
-          _buildSection(
-            title: 'Liên hệ',
-            children: [
-              _buildContactItem(
-                icon: Icons.email_outlined,
-                title: 'Email',
-                subtitle: 'support@tramdoc.app',
-                onTap: () => _showContactDialog(context, 'Email'),
-                isDark: isDark,
-              ),
-              const Divider(height: 1, indent: 72),
-              _buildContactItem(
-                icon: Icons.chat_outlined,
-                title: 'Chat trực tiếp',
-                subtitle: 'Thời gian: 9:00 - 18:00 (T2-T6)',
-                onTap: () => _showContactDialog(context, 'Chat'),
-                isDark: isDark,
-              ),
-            ],
-            isDark: isDark,
-          ),
-
-          const SizedBox(height: 24),
-
-          // FAQ Section
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 12),
-            child: Text(
-              'Câu hỏi thường gặp',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              ),
-            ),
-          ),
-
-          ...List.generate(_faqs.length, (index) {
-            final faq = _faqs[index];
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.cardDark : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: isDark
-                    ? []
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-              ),
-              child: Theme(
-                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
-                  initiallyExpanded: faq['expanded'],
-                  onExpansionChanged: (expanded) {
-                    setState(() => _faqs[index]['expanded'] = expanded);
-                  },
-                  leading: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryStart.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${index + 1}',
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primaryStart,
-                        ),
-                      ),
-                    ),
-                  ),
-                  title: Text(
-                    faq['question'],
-                    style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                    ),
-                  ),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: Text(
-                        faq['answer'],
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          height: 1.6,
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
-
-          const SizedBox(height: 24),
-
-          // Resources
-          _buildSection(
-            title: 'Tài liệu hướng dẫn',
-            children: [
-              _buildResourceItem(
-                icon: Icons.book_outlined,
-                title: 'Hướng dẫn sử dụng',
-                onTap: () => _showResourceDialog(context, 'Hướng dẫn sử dụng'),
-                isDark: isDark,
-              ),
-              const Divider(height: 1, indent: 72),
-              _buildResourceItem(
-                icon: Icons.play_circle_outline,
-                title: 'Video hướng dẫn',
-                onTap: () => _showResourceDialog(context, 'Video hướng dẫn'),
-                isDark: isDark,
-              ),
-              const Divider(height: 1, indent: 72),
-              _buildResourceItem(
-                icon: Icons.update,
-                title: 'Nhật ký cập nhật',
-                onTap: () => _showResourceDialog(context, 'Nhật ký cập nhật'),
-                isDark: isDark,
-              ),
-            ],
-            isDark: isDark,
-          ),
-
-          const SizedBox(height: 40),
         ],
       ),
     );
   }
 
-  Widget _buildSection({
-    required String title,
-    required List<Widget> children,
-    required bool isDark,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 12),
-          child: Text(
-            title,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-            ),
-          ),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.cardDark : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: isDark
-                ? []
-                : [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-          ),
-          child: Column(children: children),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildContactItem({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-    required bool isDark,
-  }) {
-    return ListTile(
-      onTap: onTap,
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: AppColors.primaryStart.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: AppColors.primaryStart, size: 20),
-      ),
-      title: Text(
-        title,
-        style: GoogleFonts.inter(
-          fontWeight: FontWeight.w500,
-          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: GoogleFonts.inter(
-          fontSize: 13,
-          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-        ),
-      ),
-      trailing: Icon(
-        Icons.chevron_right,
-        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-      ),
-    );
-  }
-
-  Widget _buildResourceItem({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    required bool isDark,
-  }) {
-    return ListTile(
-      onTap: onTap,
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: AppColors.info.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: AppColors.info, size: 20),
-      ),
-      title: Text(
-        title,
-        style: GoogleFonts.inter(
-          fontWeight: FontWeight.w500,
-          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-        ),
-      ),
-      trailing: Icon(
-        Icons.chevron_right,
-        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-      ),
-    );
-  }
-
-  void _showContactDialog(BuildContext context, String type) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          type == 'Email' 
-              ? 'Vui lòng gửi email đến support@tramdoc.app' 
-              : 'Tính năng chat đang được phát triển',
-          style: GoogleFonts.inter(),
-        ),
-        backgroundColor: AppColors.info,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  void _showResourceDialog(BuildContext context, String title) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '$title sẽ sớm có mặt!',
-          style: GoogleFonts.inter(),
-        ),
-        backgroundColor: AppColors.info,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  void _showSupportMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }

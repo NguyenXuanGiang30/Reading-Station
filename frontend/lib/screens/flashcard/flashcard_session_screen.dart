@@ -1,18 +1,25 @@
-/// FlashcardSessionScreen - Phiên ôn tập flashcard với SM-2
+﻿/// FlashcardSessionScreen - Phien on tap flashcard
 library;
 
+import 'package:flip_card/flip_card.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:flip_card/flip_card.dart';
 
-import '../../theme/colors.dart';
-import '../../services/flashcard_service.dart';
 import '../../models/flashcard.dart';
+import '../../services/flashcard_service.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_gradients.dart';
+import '../../theme/app_radius.dart';
+import '../../theme/app_spacing.dart';
+import '../../widgets/common/modern_card.dart';
+import '../../widgets/common/primary_button.dart';
+import '../../widgets/states/error_state_widget.dart';
+import '../../widgets/states/loading_widget.dart';
+import '../../l10n/app_localizations.dart';
 
 class FlashcardSessionScreen extends StatefulWidget {
   final String? deckId;
-  
+
   const FlashcardSessionScreen({super.key, this.deckId});
 
   @override
@@ -22,18 +29,17 @@ class FlashcardSessionScreen extends StatefulWidget {
 class _FlashcardSessionScreenState extends State<FlashcardSessionScreen> {
   final FlashcardService _service = FlashcardService();
   final GlobalKey<FlipCardState> _cardKey = GlobalKey<FlipCardState>();
+
   int _currentIndex = 0;
   bool _showAnswer = false;
   bool _sessionComplete = false;
   bool _isLoading = true;
   String? _error;
-  
-  // Session stats
+
   int _correctCount = 0;
   int _incorrectCount = 0;
   int _totalCards = 0;
-  
-  // Flashcards from API
+
   List<Flashcard> _flashcards = [];
 
   @override
@@ -41,32 +47,30 @@ class _FlashcardSessionScreenState extends State<FlashcardSessionScreen> {
     super.initState();
     _loadFlashcards();
   }
-  
+
   Future<void> _loadFlashcards() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
-    
+
     try {
       final cards = await _service.getDueCards(deckId: widget.deckId, limit: 20);
-      if (mounted) {
-        setState(() {
-          _flashcards = cards;
-          _totalCards = cards.length;
-          _isLoading = false;
-          if (cards.isEmpty) {
-            _sessionComplete = true;
-          }
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _flashcards = cards;
+        _totalCards = cards.length;
+        _isLoading = false;
+        if (cards.isEmpty) {
+          _sessionComplete = true;
+        }
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
     }
   }
 
@@ -74,7 +78,7 @@ class _FlashcardSessionScreenState extends State<FlashcardSessionScreen> {
     if (_cardKey.currentState?.isFront == false) {
       _cardKey.currentState?.toggleCard();
     }
-    
+
     setState(() {
       _showAnswer = false;
       if (_currentIndex < _flashcards.length - 1) {
@@ -86,158 +90,160 @@ class _FlashcardSessionScreenState extends State<FlashcardSessionScreen> {
   }
 
   Future<void> _rateCard(int quality) async {
-    // SM-2 quality: 0 = Again, 1 = Hard, 2 = Good, 3 = Easy
     if (quality >= 2) {
       _correctCount++;
     } else {
       _incorrectCount++;
     }
-    
-    // Submit review to API
+
     try {
       final card = _flashcards[_currentIndex];
       await _service.submitReview(card.id, quality);
-    } catch (e) {
-      // Ignore review errors silently
+    } catch (_) {
+      // Keep session smooth even if review persistence fails temporarily.
     }
-    
+
     _nextCard();
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
           leading: IconButton(
-            icon: const Icon(Icons.close),
+            icon: const Icon(Icons.close_rounded),
             onPressed: () => context.go('/review'),
           ),
         ),
-        body: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(color: AppColors.primaryStart),
-              SizedBox(height: 16),
-              Text('Đang tải flashcard...'),
-            ],
+        body: SafeArea(
+          child: LoadingWidget(
+            fullScreen: true,
+            message: S.of(context).t('fc_session_loading'),
           ),
         ),
       );
     }
-    
+
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64, color: AppColors.error),
-              const SizedBox(height: 16),
-              Text(_error!),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: _loadFlashcards,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Thử lại'),
-              ),
-            ],
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+            onPressed: () => context.go('/review'),
+          ),
+        ),
+        body: SafeArea(
+          child: ErrorStateWidget(
+            message: _error!,
+            onRetry: _loadFlashcards,
           ),
         ),
       );
     }
-    
+
     if (_sessionComplete) {
-      return _buildCompletionScreen(context, isDark);
+      return _buildCompletionScreen(context);
     }
-    
+
+    final currentCard = _flashcards[_currentIndex];
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => _showExitConfirmation(context),
-        ),
-        title: Text(
-          '${_currentIndex + 1} / ${_flashcards.length}',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          icon: const Icon(Icons.close_rounded),
+          onPressed: () => _showExitConfirmation(),
         ),
         centerTitle: true,
+        title: Text('${_currentIndex + 1} / ${_flashcards.length}'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              // TODO: Session settings
-            },
+            icon: const Icon(Icons.tune_rounded),
+            onPressed: () => _showSessionSettings(),
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Progress bar
-          LinearProgressIndicator(
-            value: (_currentIndex + 1) / _flashcards.length,
-            backgroundColor: Colors.grey.shade200,
-            valueColor: const AlwaysStoppedAnimation(AppColors.primaryStart),
-            minHeight: 4,
-          ),
-          
-          // Stats row
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildStatBadge(Icons.check, _correctCount, AppColors.success),
-                const SizedBox(width: 24),
-                _buildStatBadge(Icons.close, _incorrectCount, AppColors.error),
-              ],
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              child: ModernCard(
+                gradient: AppGradients.warmHero,
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _SessionBadge(
+                            icon: Icons.check_circle_rounded,
+                            value: '$_correctCount',
+                            label: S.of(context).t('summary_correct'),
+                            color: AppColors.success,
+                          ),
+                        ),
+                        Expanded(
+                          child: _SessionBadge(
+                            icon: Icons.cancel_rounded,
+                            value: '$_incorrectCount',
+                            label: S.of(context).t('summary_wrong'),
+                            color: AppColors.error,
+                          ),
+                        ),
+                        Expanded(
+                          child: _SessionBadge(
+                            icon: Icons.menu_book_rounded,
+                            value: '${currentCard.interval}',
+                            label: S.of(context).t('fc_cycle'),
+                            color: AppColors.info,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: LinearProgressIndicator(
+                        value: (_currentIndex + 1) / _flashcards.length,
+                        minHeight: 8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-          
-          // Card
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: _buildFlashcard(isDark),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                child: _buildFlashcard(currentCard),
+              ),
             ),
-          ),
-          
-          // Rating buttons
-          if (_showAnswer)
-            _buildRatingButtons(isDark)
-          else
-            _buildShowAnswerButton(),
-          
-          const SizedBox(height: 24),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatBadge(IconData icon, int count, Color color) {
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(width: 4),
-        Text(
-          '$count',
-          style: GoogleFonts.inter(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: color,
-          ),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child:
+                  _showAnswer
+                      ? _buildRatingButtons()
+                      : Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                        child: PrimaryButton(
+                          label: S.of(context).t('fc_session_flip'),
+                          icon: const Icon(
+                            Icons.flip_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                          onPressed: () => _cardKey.currentState?.toggleCard(),
+                        ),
+                      ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildFlashcard(bool isDark) {
-    final card = _flashcards[_currentIndex];
-    
+  Widget _buildFlashcard(Flashcard card) {
     return FlipCard(
       key: _cardKey,
       direction: FlipDirection.HORIZONTAL,
@@ -248,45 +254,43 @@ class _FlashcardSessionScreenState extends State<FlashcardSessionScreen> {
         });
       },
       front: _buildCardSide(
+        label: S.of(context).t('fc_session_front'),
         content: card.question,
-        label: 'Câu hỏi',
-        isDark: isDark,
-        isFront: true,
+        gradient: AppColors.primaryGradient,
+        footer:
+            card.bookTitle == null || card.bookTitle!.isEmpty
+                ? S.of(context).t('fc_tap_flip')
+                : '${S.of(context).t("fc_from_book")}: ${card.bookTitle}',
       ),
       back: _buildCardSide(
+        label: S.of(context).t('fc_session_back'),
         content: card.answer,
-        label: 'Câu trả lời',
-        isDark: isDark,
-        isFront: false,
-        bookName: card.bookTitle,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2F8F83), Color(0xFF67C5B8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        footer: S.of(context).t('fc_rate_below'),
       ),
     );
   }
 
   Widget _buildCardSide({
-    required String content,
     required String label,
-    required bool isDark,
-    required bool isFront,
-    String? bookName,
+    required String content,
+    required Gradient gradient,
+    required String footer,
   }) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: isFront
-            ? AppColors.primaryGradient
-            : const LinearGradient(
-                colors: [Color(0xFF11998e), Color(0xFF38ef7d)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-        borderRadius: BorderRadius.circular(24),
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
         boxShadow: [
           BoxShadow(
-            color: (isFront ? AppColors.primaryStart : const Color(0xFF11998e))
-                .withValues(alpha: 0.4),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: AppColors.primary.withValues(alpha: 0.18),
+            blurRadius: 24,
+            offset: const Offset(0, 16),
           ),
         ],
       ),
@@ -294,139 +298,92 @@ class _FlashcardSessionScreenState extends State<FlashcardSessionScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            // Label
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(20),
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
                 label,
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: Colors.white,
                 ),
               ),
             ),
-            
-            // Content
             Expanded(
               child: Center(
-                child: Text(
-                  content,
-                  style: GoogleFonts.inter(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                    height: 1.5,
+                child: SingleChildScrollView(
+                  child: Text(
+                    content,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: Colors.white,
+                      height: 1.35,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
                 ),
               ),
             ),
-            
-            // Book name
-            if (bookName != null)
-              Text(
-                '📚 $bookName',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  color: Colors.white.withValues(alpha: 0.8),
-                ),
+            Text(
+              footer,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.88),
               ),
-            
-            // Tap hint
-            if (isFront) ...[
-              const SizedBox(height: 12),
-              Text(
-                'Chạm để lật thẻ',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: Colors.white.withValues(alpha: 0.6),
-                ),
-              ),
-            ],
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildShowAnswerButton() {
+  Widget _buildRatingButtons() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: SizedBox(
-        width: double.infinity,
-        height: 56,
-        child: ElevatedButton(
-          onPressed: () {
-            _cardKey.currentState?.toggleCard();
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primaryStart,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-          child: Text(
-            'Hiện câu trả lời',
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRatingButtons(bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      key: const ValueKey('rating-buttons'),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       child: Column(
         children: [
           Text(
-            'Bạn nhớ được bao nhiêu?',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-            ),
+            S.of(context).t('fc_how_well'),
+            style: Theme.of(context).textTheme.bodySmall,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Row(
             children: [
               Expanded(
-                child: _buildRatingButton(
-                  label: 'Quên',
+                child: _RatingButton(
+                  label: S.of(context).t('fc_forgot'),
                   color: AppColors.error,
-                  quality: 0,
+                  onTap: () => _rateCard(0),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
-                child: _buildRatingButton(
-                  label: 'Khó',
+                child: _RatingButton(
+                  label: S.of(context).t('fc_session_hard'),
                   color: AppColors.warning,
-                  quality: 1,
+                  onTap: () => _rateCard(1),
                 ),
               ),
-              const SizedBox(width: 8),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
               Expanded(
-                child: _buildRatingButton(
-                  label: 'Tốt',
+                child: _RatingButton(
+                  label: S.of(context).t('fc_session_good'),
                   color: AppColors.info,
-                  quality: 2,
+                  onTap: () => _rateCard(2),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
-                child: _buildRatingButton(
-                  label: 'Dễ',
+                child: _RatingButton(
+                  label: S.of(context).t('fc_session_easy'),
                   color: AppColors.success,
-                  quality: 3,
+                  onTap: () => _rateCard(3),
                 ),
               ),
             ],
@@ -436,237 +393,355 @@ class _FlashcardSessionScreenState extends State<FlashcardSessionScreen> {
     );
   }
 
-  Widget _buildRatingButton({
-    required String label,
-    required Color color,
-    required int quality,
-  }) {
-    return ElevatedButton(
-      onPressed: () => _rateCard(quality),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.inter(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
+  Widget _buildCompletionScreen(BuildContext context) {
+    final accuracy =
+        _totalCards > 0 ? (_correctCount / _totalCards * 100).round() : 0;
+
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(gradient: AppGradients.sunriseAccent),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                Align(
+                  alignment: Alignment.topRight,
+                  child: IconButton(
+                    onPressed: () => context.go('/review'),
+                    icon: const Icon(Icons.close_rounded, color: Colors.white),
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.16),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.celebration_rounded,
+                    size: 58,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.huge),
+                Text(
+                  S.of(context).t('fc_session_complete'),
+                  style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                    color: Colors.white,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  '${S.of(context).t("fc_session_done_desc")}',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.92),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.huge),
+                ModernCard(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.white.withValues(alpha: 0.96),
+                      Colors.white.withValues(alpha: 0.88),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _SummaryBadge(
+                              label: S.of(context).t('summary_correct'),
+                              value: '$_correctCount',
+                              color: AppColors.success,
+                            ),
+                          ),
+                          Expanded(
+                            child: _SummaryBadge(
+                              label: S.of(context).t('summary_wrong'),
+                              value: '$_incorrectCount',
+                              color: AppColors.error,
+                            ),
+                          ),
+                          Expanded(
+                            child: _SummaryBadge(
+                              label: S.of(context).t('summary_accuracy'),
+                              value: '$accuracy%',
+                              color: accuracy >= 70 ? AppColors.success : AppColors.warning,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: LinearProgressIndicator(
+                          value: accuracy / 100,
+                          minHeight: 10,
+                          backgroundColor: AppColors.surfaceMuted,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            accuracy >= 70 ? AppColors.success : AppColors.warning,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _restartSession,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white),
+                        ),
+                        child: Text(S.of(context).t('fc_session_again')),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => context.go('/review'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppColors.primary,
+                        ),
+                        child: Text(S.of(context).t('fc_finish')),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildCompletionScreen(BuildContext context, bool isDark) {
-    final accuracy = _totalCards > 0 
-        ? (_correctCount / _totalCards * 100).toInt() 
-        : 0;
-    
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Celebration icon
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.celebration,
-                  size: 60,
-                  color: AppColors.success,
-                ),
+  void _restartSession() {
+    setState(() {
+      _currentIndex = 0;
+      _correctCount = 0;
+      _incorrectCount = 0;
+      _sessionComplete = false;
+      _showAnswer = false;
+    });
+  }
+
+  void _showExitConfirmation() {
+    showDialog<void>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: Text(S.of(context).t('fc_exit_title')),
+            content: Text(S.of(context).t('fc_exit_msg')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(S.of(context).t('focus_resume')),
               ),
-              
-              const SizedBox(height: 32),
-              
-              Text(
-                'Hoàn thành! 🎉',
-                style: GoogleFonts.playfairDisplay(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                ),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              Text(
-                'Bạn đã ôn xong $_totalCards thẻ',
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
-              ),
-              
-              const SizedBox(height: 40),
-              
-              // Stats
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.cardDark : Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: isDark ? [] : [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 15,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _buildCompletionStat(
-                          value: '$_correctCount',
-                          label: 'Đúng',
-                          color: AppColors.success,
-                        ),
-                        _buildCompletionStat(
-                          value: '$_incorrectCount',
-                          label: 'Sai',
-                          color: AppColors.error,
-                        ),
-                        _buildCompletionStat(
-                          value: '$accuracy%',
-                          label: 'Chính xác',
-                          color: AppColors.primaryStart,
-                        ),
-                      ],
-                    ),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Accuracy bar
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: LinearProgressIndicator(
-                        value: accuracy / 100,
-                        backgroundColor: Colors.grey.shade200,
-                        valueColor: AlwaysStoppedAnimation(
-                          accuracy >= 70 ? AppColors.success : AppColors.warning,
-                        ),
-                        minHeight: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              
-              const Spacer(),
-              
-              // Actions
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        setState(() {
-                          _currentIndex = 0;
-                          _correctCount = 0;
-                          _incorrectCount = 0;
-                          _sessionComplete = false;
-                          _showAnswer = false;
-                        });
-                      },
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        'Ôn lại',
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => context.go('/review'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryStart,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        'Hoàn tất',
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  context.go('/review');
+                },
+                child: Text(S.of(context).t('focus_stop')),
               ),
             ],
           ),
-        ),
-      ),
     );
   }
 
-  Widget _buildCompletionStat({
-    required String value,
-    required String label,
-    required Color color,
-  }) {
+  void _showSessionSettings() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder:
+          (context) => Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  S.of(context).t('fc_settings_title'),
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  S.of(context).t('fc_settings_desc'),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                _SheetActionTile(
+                  icon: Icons.format_list_numbered_rounded,
+                  title: S.of(context).t('fc_max_cards'),
+                  subtitle: S.of(context).t('fc_max_cards_desc'),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _SheetActionTile(
+                  icon: Icons.shuffle_rounded,
+                  title: S.of(context).t('fc_shuffle'),
+                  subtitle: S.of(context).t('fc_shuffle_desc'),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _SheetActionTile(
+                  icon: Icons.schedule_rounded,
+                  title: S.of(context).t('fc_auto_flip'),
+                  subtitle: S.of(context).t('fc_auto_flip_desc'),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      this.context.push('/settings/flashcard');
+                    },
+                    child: Text(S.of(context).t('fc_open_settings')),
+                  ),
+                ),
+              ],
+            ),
+          ),
+    );
+  }
+}
+
+class _SessionBadge extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color color;
+
+  const _SessionBadge({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(
-          value,
-          style: GoogleFonts.inter(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: color,
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
           ),
+          child: Icon(icon, color: color),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: AppSpacing.sm),
+        Text(value, style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: AppSpacing.xs),
         Text(
           label,
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            color: Colors.grey,
-          ),
+          style: Theme.of(context).textTheme.bodySmall,
+          textAlign: TextAlign.center,
         ),
       ],
     );
   }
+}
 
-  void _showExitConfirmation(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Kết thúc phiên ôn tập?'),
-        content: const Text('Tiến độ hiện tại sẽ được lưu lại.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Tiếp tục'),
+class _RatingButton extends StatelessWidget {
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _RatingButton({
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton(
+      onPressed: onTap,
+      style: FilledButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+      ),
+      child: Text(label),
+    );
+  }
+}
+
+class _SummaryBadge extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _SummaryBadge({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            color: color,
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.go('/review');
-            },
-            child: const Text('Kết thúc'),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+      ],
+    );
+  }
+}
+
+class _SheetActionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _SheetActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ModernCard(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.primarySoft,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: AppColors.primary),
+          ),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: AppSpacing.xs),
+                Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
           ),
         ],
       ),

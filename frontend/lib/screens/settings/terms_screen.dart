@@ -1,147 +1,139 @@
-/// TermsScreen - Điều khoản sử dụng
+/// TermsScreen - Dieu khoan su dung
 library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../theme/colors.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_gradients.dart';
+import '../../theme/app_spacing.dart';
+import '../../widgets/common/custom_app_bar.dart';
+import '../../widgets/common/modern_card.dart';
+import '../../widgets/common/section_header.dart';
+import '../../l10n/app_localizations.dart';
 
 class TermsScreen extends StatelessWidget {
   const TermsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sections = <Map<String, String>>[
+      {
+        'title': S.of(context).t('terms_s1_title'),
+        'content':
+            S.of(context).t('terms_s1_content'),
+      },
+      {
+        'title': S.of(context).t('terms_s2_title'),
+        'content':
+            S.of(context).t('terms_s2_content'),
+      },
+      {
+        'title': S.of(context).t('terms_s3_title'),
+        'content':
+            S.of(context).t('terms_s3_content'),
+      },
+      {
+        'title': S.of(context).t('terms_s4_title'),
+        'content':
+            S.of(context).t('terms_s4_content'),
+      },
+      {
+        'title': S.of(context).t('terms_s5_title'),
+        'content':
+            S.of(context).t('terms_s5_content'),
+      },
+      {
+        'title': S.of(context).t('terms_s6_title'),
+        'content':
+            S.of(context).t('terms_s6_content'),
+      },
+      {
+        'title': S.of(context).t('terms_s7_title'),
+        'content':
+            S.of(context).t('terms_s7_content'),
+      },
+      {
+        'title': S.of(context).t('terms_s8_title'),
+        'content':
+            S.of(context).t('terms_s8_content'),
+      },
+    ];
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Điều khoản sử dụng',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-        ),
+      appBar: CustomAppBar(
+        title: S.of(context).t('terms_title'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          // Last updated
-          Center(
-            child: Text(
-              'Cập nhật lần cuối: 01/01/2024',
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          children: [
+            ModernCard(
+              gradient: AppGradients.warmHero,
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    S.of(context).t('terms_title'),
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    S.of(context).t('terms_updated'),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelLarge?.copyWith(color: AppColors.primary),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    S.of(context).t('terms_intro'),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-
-          const SizedBox(height: 24),
-
-          _buildSection(
-            title: '1. Chấp nhận điều khoản',
-            content: 'Bằng việc sử dụng ứng dụng Trạm Đọc, bạn đồng ý tuân thủ các điều khoản và điều kiện được nêu trong tài liệu này. Nếu bạn không đồng ý với bất kỳ điều khoản nào, vui lòng ngừng sử dụng ứng dụng.',
-            isDark: isDark,
-          ),
-
-          _buildSection(
-            title: '2. Tài khoản người dùng',
-            content: '''• Bạn phải cung cấp thông tin chính xác khi đăng ký tài khoản.
-• Bạn có trách nhiệm bảo mật thông tin đăng nhập của mình.
-• Bạn chịu trách nhiệm về mọi hoạt động diễn ra trên tài khoản của mình.
-• Chúng tôi có quyền tạm ngưng hoặc chấm dứt tài khoản vi phạm điều khoản.''',
-            isDark: isDark,
-          ),
-
-          _buildSection(
-            title: '3. Quyền sở hữu trí tuệ',
-            content: '''• Nội dung ứng dụng (logo, giao diện, mã nguồn) thuộc quyền sở hữu của Trạm Đọc.
-• Bạn giữ quyền sở hữu với các ghi chú, flashcard và nội dung bạn tạo.
-• Bạn không được sao chép, phân phối hoặc sửa đổi ứng dụng mà không có sự cho phép.''',
-            isDark: isDark,
-          ),
-
-          _buildSection(
-            title: '4. Quy tắc cộng đồng',
-            content: '''Khi sử dụng tính năng xã hội, bạn cam kết:
-• Không đăng nội dung vi phạm pháp luật, thô tục hoặc xúc phạm.
-• Tôn trọng quyền riêng tư của người dùng khác.
-• Không spam hoặc quấy rối người dùng khác.
-• Không chia sẻ thông tin sai lệch hoặc gây hiểu lầm.''',
-            isDark: isDark,
-          ),
-
-          _buildSection(
-            title: '5. Giới hạn trách nhiệm',
-            content: '''• Trạm Đọc được cung cấp "nguyên trạng" mà không có bảo đảm nào.
-• Chúng tôi không chịu trách nhiệm về việc mất dữ liệu do lỗi kỹ thuật.
-• Chúng tôi khuyến khích bạn thường xuyên sao lưu dữ liệu.''',
-            isDark: isDark,
-          ),
-
-          _buildSection(
-            title: '6. Bảo mật dữ liệu',
-            content: 'Việc thu thập và xử lý dữ liệu cá nhân của bạn được thực hiện theo Chính sách bảo mật của chúng tôi. Chúng tôi cam kết bảo vệ thông tin của bạn và không chia sẻ với bên thứ ba mà không có sự đồng ý.',
-            isDark: isDark,
-          ),
-
-          _buildSection(
-            title: '7. Thay đổi điều khoản',
-            content: 'Chúng tôi có quyền cập nhật điều khoản này theo thời gian. Các thay đổi quan trọng sẽ được thông báo qua ứng dụng. Việc tiếp tục sử dụng sau khi thay đổi đồng nghĩa với việc bạn chấp nhận các điều khoản mới.',
-            isDark: isDark,
-          ),
-
-          _buildSection(
-            title: '8. Liên hệ',
-            content: 'Nếu bạn có câu hỏi về điều khoản sử dụng, vui lòng liên hệ:\n\n📧 Email: support@tramdoc.app\n🌐 Website: https://tramdoc.app',
-            isDark: isDark,
-          ),
-
-          const SizedBox(height: 40),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSection({
-    required String title,
-    required String content,
-    required bool isDark,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.cardDark : Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              content,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                height: 1.6,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            const SizedBox(height: AppSpacing.xl),
+            ...sections.map(
+              (section) => Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+                child: ModernCard(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        section['title']!,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        section['content']!,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
+            ModernCard(
+              padding: const EdgeInsets.all(20),
+              gradient: AppGradients.softGlassOverlay,
+              child: SectionHeader(
+                title: S.of(context).t('terms_need_help'),
+                subtitle:
+                    S.of(context).t('terms_need_help_desc'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

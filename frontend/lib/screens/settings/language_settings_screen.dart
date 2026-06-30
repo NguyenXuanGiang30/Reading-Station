@@ -3,187 +3,176 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
-import '../../theme/colors.dart';
-import '../../services/settings_service.dart';
+import '../../l10n/app_localizations.dart';
+import '../../l10n/locale_provider.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_gradients.dart';
+import '../../theme/app_radius.dart';
+import '../../theme/app_spacing.dart';
+import '../../widgets/common/custom_app_bar.dart';
+import '../../widgets/common/modern_card.dart';
+import '../../widgets/common/section_header.dart';
+import '../../widgets/settings/settings_section_card.dart';
 
-class LanguageSettingsScreen extends StatefulWidget {
+class LanguageSettingsScreen extends StatelessWidget {
   const LanguageSettingsScreen({super.key});
 
   @override
-  State<LanguageSettingsScreen> createState() => _LanguageSettingsScreenState();
-}
-
-class _LanguageSettingsScreenState extends State<LanguageSettingsScreen> {
-  final SettingsService _settingsService = SettingsService();
-  
-  String _selectedLanguage = 'vi';
-  bool _isLoading = true;
-
-  final List<Map<String, String>> _languages = [
-    {'code': 'vi', 'name': 'Tiếng Việt', 'flag': '🇻🇳'},
-    {'code': 'en', 'name': 'English', 'flag': '🇺🇸'},
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadLanguage();
-  }
-
-  Future<void> _loadLanguage() async {
-    final language = await _settingsService.getLanguage();
-    if (mounted) {
-      setState(() {
-        _selectedLanguage = language;
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _selectLanguage(String code) async {
-    setState(() => _selectedLanguage = code);
-    await _settingsService.setLanguage(code);
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            code == 'vi' 
-                ? 'Đã chuyển sang Tiếng Việt' 
-                : 'Switched to English',
-            style: GoogleFonts.inter(),
-          ),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final s = S.of(context);
+    final localeProvider = Provider.of<LocaleProvider>(context);
+    final currentCode = localeProvider.locale.languageCode;
+
+    final languages = [
+      {
+        'code': 'vi',
+        'name': s.t('lang_vi_name'),
+        'subtitle': s.t('lang_vi_desc'),
+      },
+      {
+        'code': 'en',
+        'name': s.t('lang_en_name'),
+        'subtitle': s.t('lang_en_desc'),
+      },
+    ];
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Ngôn ngữ',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-        ),
+      appBar: CustomAppBar(
+        title: s.t('settings_language'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                // Info
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryStart.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.translate, color: AppColors.primaryStart),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Chọn ngôn ngữ hiển thị cho ứng dụng.',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                          ),
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          children: [
+            _buildHeroCard(context),
+            const SizedBox(height: AppSpacing.xl),
+            SettingsSectionCard(
+              title: s.t('lang_display_title'),
+              subtitle: s.t('lang_display_desc'),
+              children: languages.map((language) {
+                final selected = currentCode == language['code'];
+
+                return ListTile(
+                  onTap: () {
+                    localeProvider.setLocale(Locale(language['code']!));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          language['code'] == 'vi'
+                              ? s.t('lang_switched_vi')
+                              : s.t('lang_switched_en'),
                         ),
                       ),
-                    ],
+                    );
+                  },
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                    vertical: AppSpacing.sm,
                   ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Language list
-                Container(
-                  decoration: BoxDecoration(
-                    color: isDark ? AppColors.cardDark : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: isDark
-                        ? []
-                        : [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.primarySoft,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    child: const Icon(
+                      Icons.translate_rounded,
+                      color: AppColors.primary,
+                    ),
                   ),
-                  child: Column(
-                    children: _languages.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final lang = entry.value;
-                      final isSelected = _selectedLanguage == lang['code'];
-                      
-                      return Column(
-                        children: [
-                          ListTile(
-                            onTap: () => _selectLanguage(lang['code']!),
-                            leading: Text(
-                              lang['flag']!,
-                              style: const TextStyle(fontSize: 28),
-                            ),
-                            title: Text(
-                              lang['name']!,
-                              style: GoogleFonts.inter(
-                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                                color: isSelected 
-                                    ? AppColors.primaryStart 
-                                    : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
-                              ),
-                            ),
-                            trailing: isSelected
-                                ? Container(
-                                    width: 24,
-                                    height: 24,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primaryStart,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.check,
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
-                                  )
-                                : null,
+                  title: Text(
+                    language['name']!,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: selected ? AppColors.primary : null,
+                        ),
+                  ),
+                  subtitle: Text(
+                    language['subtitle']!,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  trailing: selected
+                      ? Container(
+                          width: 28,
+                          height: 28,
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
                           ),
-                          if (index < _languages.length - 1)
-                            const Divider(height: 1, indent: 72),
-                        ],
-                      );
-                    }).toList(),
-                  ),
-                ),
+                          child: const Icon(
+                            Icons.check_rounded,
+                            size: 18,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.textSecondary,
+                        ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            ModernCard(
+              padding: const EdgeInsets.all(20),
+              gradient: AppGradients.softGlassOverlay,
+              child: SectionHeader(
+                title: s.t('lang_note_title'),
+                subtitle: s.t('lang_note_desc'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-                const SizedBox(height: 32),
+  Widget _buildHeroCard(BuildContext context) {
+    final s = S.of(context);
+    final isVi = s.t('nav_home') == 'Trang chủ';
 
-                // Note
+    return ModernCard(
+      gradient: AppGradients.warmHero,
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.88),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.language_rounded, color: AppColors.primary),
+          ),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  'Lưu ý: Một số nội dung có thể vẫn hiển thị bằng ngôn ngữ gốc.',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                    fontStyle: FontStyle.italic,
-                  ),
-                  textAlign: TextAlign.center,
+                  s.t('lang_hero_title'),
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  s.t('lang_hero_desc'),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                 ),
               ],
             ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -3,13 +3,13 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../theme/colors.dart';
+import '../l10n/app_localizations.dart';
+import '../widgets/navigation/custom_bottom_nav_bar.dart';
 
 class MainWrapper extends StatefulWidget {
   final Widget child;
-  
+
   const MainWrapper({super.key, required this.child});
 
   @override
@@ -18,38 +18,28 @@ class MainWrapper extends StatefulWidget {
 
 class _MainWrapperState extends State<MainWrapper> {
   int _currentIndex = 0;
-  
-  static const List<_NavItem> _navItems = [
-    _NavItem(
-      path: '/',
-      icon: Icons.home_outlined,
-      activeIcon: Icons.home_rounded,
-      label: 'Trang chủ',
-    ),
-    _NavItem(
-      path: '/library',
-      icon: Icons.library_books_outlined,
-      activeIcon: Icons.library_books_rounded,
-      label: 'Thư viện',
-    ),
-    _NavItem(
-      path: '/review',
-      icon: Icons.psychology_outlined,
-      activeIcon: Icons.psychology_rounded,
-      label: 'Ôn tập',
-    ),
-    _NavItem(
-      path: '/social',
-      icon: Icons.people_outline,
-      activeIcon: Icons.people_rounded,
-      label: 'Tin cậy',
-    ),
-    _NavItem(
-      path: '/profile',
-      icon: Icons.person_outline,
-      activeIcon: Icons.person_rounded,
-      label: 'Cá nhân',
-    ),
+
+  static const List<String> _paths = ['/', '/library', '/review', '/social', '/profile'];
+  static const List<IconData> _icons = [
+    Icons.home_outlined,
+    Icons.local_library_outlined,
+    Icons.auto_awesome_outlined,
+    Icons.groups_2_outlined,
+    Icons.person_outline_rounded,
+  ];
+  static const List<IconData> _selectedIcons = [
+    Icons.home_rounded,
+    Icons.local_library_rounded,
+    Icons.auto_awesome_rounded,
+    Icons.groups_2_rounded,
+    Icons.person_rounded,
+  ];
+  static const List<String> _labelKeys = [
+    'nav_home',
+    'nav_library',
+    'nav_review',
+    'nav_social',
+    'nav_profile',
   ];
 
   @override
@@ -60,113 +50,35 @@ class _MainWrapperState extends State<MainWrapper> {
 
   void _updateIndex() {
     final location = GoRouterState.of(context).matchedLocation;
-    final index = _navItems.indexWhere((item) => item.path == location);
+    final index = _paths.indexOf(location);
     if (index != -1 && index != _currentIndex) {
-      setState(() {
-        _currentIndex = index;
-      });
+      setState(() => _currentIndex = index);
     }
   }
 
   void _onTap(int index) {
-    if (index != _currentIndex) {
-      setState(() {
-        _currentIndex = index;
-      });
-      context.go(_navItems[index].path);
-    }
+    if (index == _currentIndex) return;
+    setState(() => _currentIndex = index);
+    context.go(_paths[index]);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+    final s = S.of(context);
     return Scaffold(
       body: widget.child,
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.surfaceDark : Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: List.generate(
-                _navItems.length,
-                (index) => _buildNavItem(index, isDark),
-              ),
-            ),
+      bottomNavigationBar: CustomBottomNavBar(
+        currentIndex: _currentIndex,
+        onDestinationSelected: _onTap,
+        destinations: List.generate(
+          _paths.length,
+          (i) => NavigationDestination(
+            icon: Icon(_icons[i]),
+            selectedIcon: Icon(_selectedIcons[i]),
+            label: s.t(_labelKeys[i]),
           ),
         ),
       ),
     );
   }
-
-  Widget _buildNavItem(int index, bool isDark) {
-    final item = _navItems[index];
-    final isSelected = index == _currentIndex;
-    
-    return GestureDetector(
-      onTap: () => _onTap(index),
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(
-          horizontal: isSelected ? 16 : 12,
-          vertical: 8,
-        ),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primaryStart.withValues(alpha: 0.15)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isSelected ? item.activeIcon : item.icon,
-              color: isSelected
-                  ? AppColors.primaryStart
-                  : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-              size: 24,
-            ),
-            if (isSelected) ...[
-              const SizedBox(width: 8),
-              Text(
-                item.label,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primaryStart,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem {
-  final String path;
-  final IconData icon;
-  final IconData activeIcon;
-  final String label;
-  
-  const _NavItem({
-    required this.path,
-    required this.icon,
-    required this.activeIcon,
-    required this.label,
-  });
 }

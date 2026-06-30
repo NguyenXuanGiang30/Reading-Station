@@ -2,150 +2,138 @@
 library;
 
 import 'api_service.dart';
+import '../exceptions/app_exception.dart';
 
 class FriendService {
   final ApiService _api = ApiService();
-  
-  /// Get friends list
-  Future<List<Map<String, dynamic>>> getFriends({
-    int page = 0,
-    int size = 50,
-  }) async {
+
+  Future<List<Map<String, dynamic>>> getFriends({int page = 0, int size = 50}) async {
     try {
       final response = await _api.get('/friends', queryParameters: {
         'page': page,
         'size': size,
       });
-      
+
       if (response.data != null) {
-        final content = response.data['content'] as List;
-        return content.cast<Map<String, dynamic>>();
+        final content = response.data['content'] as List? ?? const [];
+        return content
+            .map((item) => item as Map<String, dynamic>)
+            .toList();
       }
       return [];
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể tải danh sách bạn bè: $e');
+      throw Exception('Khong the tai danh sach ban be: $e');
     }
   }
-  
-  /// Get friend profile
+
   Future<Map<String, dynamic>?> getFriendProfile(String friendId) async {
     try {
-      final response = await _api.get('/friends/$friendId');
-      return response.data;
+      final response = await _api.get('/friends/$friendId/profile');
+      return response.data as Map<String, dynamic>?;
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể tải thông tin bạn bè: $e');
+      throw Exception('Khong the tai thong tin ban be: $e');
     }
   }
-  
-  /// Get activity feed
-  Future<List<Map<String, dynamic>>> getActivityFeed({
-    int page = 0,
-    int size = 20,
-  }) async {
+
+  Future<List<Map<String, dynamic>>> getFriendBooks(String friendId) async {
     try {
-      final response = await _api.get('/friends/feed', queryParameters: {
-        'page': page,
-        'size': size,
-      });
-      
+      final response = await _api.get('/friends/$friendId/books');
       if (response.data != null) {
-        final content = response.data['content'] as List;
-        return content.cast<Map<String, dynamic>>();
+        return (response.data as List)
+            .map((item) => item as Map<String, dynamic>)
+            .toList();
       }
       return [];
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể tải hoạt động: $e');
+      throw Exception('Khong the tai sach cua ban be: $e');
     }
   }
-  
-  /// Send friend request
+
   Future<bool> sendFriendRequest(String userId) async {
     try {
-      await _api.post('/friends/request', data: {
-        'userId': userId,
-      });
+      await _api.post('/friends/request/$userId');
       return true;
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể gửi lời mời: $e');
+      throw Exception('Khong the gui loi moi: $e');
     }
   }
-  
-  /// Accept friend request
+
   Future<bool> acceptFriendRequest(String requestId) async {
     try {
-      await _api.post('/friends/request/$requestId/accept');
+      await _api.put('/friends/$requestId/accept');
       return true;
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể chấp nhận lời mời: $e');
+      throw Exception('Khong the chap nhan loi moi: $e');
     }
   }
-  
-  /// Reject friend request
+
   Future<bool> rejectFriendRequest(String requestId) async {
     try {
-      await _api.post('/friends/request/$requestId/reject');
+      await _api.delete('/friends/$requestId');
       return true;
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể từ chối lời mời: $e');
+      throw Exception('Khong the tu choi loi moi: $e');
     }
   }
-  
-  /// Remove friend
+
   Future<bool> removeFriend(String friendId) async {
     try {
       await _api.delete('/friends/$friendId');
       return true;
+    } on AppException {
+      rethrow;
     } catch (e) {
-      throw Exception('Không thể xóa bạn bè: $e');
+      throw Exception('Khong the xoa ban be: $e');
     }
   }
-  
-  /// Get pending friend requests
+
   Future<List<Map<String, dynamic>>> getPendingRequests() async {
-    try {
-      final response = await _api.get('/friends/requests/pending');
-      if (response.data != null) {
-        return (response.data as List).cast<Map<String, dynamic>>();
-      }
-      return [];
-    } catch (e) {
-      return [];
-    }
+    return getFriends();
   }
-  
-  /// Search users
+
   Future<List<Map<String, dynamic>>> searchUsers(String query) async {
     try {
       final response = await _api.get('/users/search', queryParameters: {
         'q': query,
       });
-      
+
       if (response.data != null) {
-        return (response.data as List).cast<Map<String, dynamic>>();
+        if (response.data is Map && response.data.containsKey('content')) {
+          return (response.data['content'] as List)
+              .map((item) => item as Map<String, dynamic>)
+              .toList();
+        }
+        if (response.data is List) {
+          return (response.data as List)
+              .map((item) => item as Map<String, dynamic>)
+              .toList();
+        }
       }
       return [];
-    } catch (e) {
+    } on AppException {
+      rethrow;
+    } catch (_) {
       return [];
     }
   }
-  
-  /// Follow user
+
   Future<bool> followUser(String userId) async {
-    try {
-      await _api.post('/friends/$userId/follow');
-      return true;
-    } catch (e) {
-      throw Exception('Không thể theo dõi: $e');
-    }
+    return sendFriendRequest(userId);
   }
-  
-  /// Unfollow user
+
   Future<bool> unfollowUser(String userId) async {
-    try {
-      await _api.delete('/friends/$userId/follow');
-      return true;
-    } catch (e) {
-      throw Exception('Không thể bỏ theo dõi: $e');
-    }
+    return removeFriend(userId);
   }
 }

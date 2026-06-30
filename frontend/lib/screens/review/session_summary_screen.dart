@@ -1,12 +1,16 @@
-/// SessionSummaryScreen - Tổng kết sau phiên ôn tập flashcard
+/// SessionSummaryScreen - Tong ket sau phien on tap flashcard
 library;
 
+import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:confetti/confetti.dart';
 
-import '../../theme/colors.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_gradients.dart';
+import '../../theme/app_radius.dart';
+import '../../theme/app_spacing.dart';
+import '../../widgets/common/modern_card.dart';
+import '../../l10n/app_localizations.dart';
 
 class SessionSummaryScreen extends StatefulWidget {
   final int totalCards;
@@ -14,7 +18,7 @@ class SessionSummaryScreen extends StatefulWidget {
   final int incorrectCards;
   final int timeSpentSeconds;
   final String? deckName;
-  
+
   const SessionSummaryScreen({
     super.key,
     required this.totalCards,
@@ -29,25 +33,33 @@ class SessionSummaryScreen extends StatefulWidget {
 }
 
 class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
-  late ConfettiController _confettiController;
-  
-  double get accuracy => widget.totalCards > 0 
-      ? (widget.correctCards / widget.totalCards * 100) 
-      : 0;
-  
-  String get grade {
-    if (accuracy >= 90) return 'Xuất sắc! 🏆';
-    if (accuracy >= 70) return 'Tốt lắm! 👏';
-    if (accuracy >= 50) return 'Khá tốt! 💪';
-    return 'Cố gắng hơn! 📚';
+  late final ConfettiController _confettiController;
+
+  double get accuracy {
+    if (widget.totalCards == 0) return 0;
+    return widget.correctCards / widget.totalCards * 100;
+  }
+
+  String get headline {
+    if (accuracy >= 90) return S.of(context).t('summary_excellent');
+    if (accuracy >= 70) return S.of(context).t('summary_very_good');
+    if (accuracy >= 50) return S.of(context).t('summary_good_progress');
+    return S.of(context).t('summary_keep_going');
+  }
+
+  String get supportingCopy {
+    if (accuracy >= 90) return S.of(context).t('summary_excellent_desc');
+    if (accuracy >= 70) return S.of(context).t('summary_good_desc');
+    if (accuracy >= 50) return S.of(context).t('summary_progress_desc');
+    return S.of(context).t('summary_keep_going_desc');
   }
 
   @override
   void initState() {
     super.initState();
-    _confettiController = ConfettiController(duration: const Duration(seconds: 3));
-    
-    // Play confetti if performance is good
+    _confettiController = ConfettiController(
+      duration: const Duration(seconds: 3),
+    );
     if (accuracy >= 70) {
       _confettiController.play();
     }
@@ -60,217 +72,205 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
   }
 
   String _formatTime(int seconds) {
-    if (seconds < 60) return '$seconds giây';
-    final mins = seconds ~/ 60;
-    final secs = seconds % 60;
-    return '$mins phút $secs giây';
+    if (seconds < 60) return '$seconds giay';
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    return '$minutes phut $remainingSeconds giay';
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+    final scoreColor = _scoreColor();
+
     return Scaffold(
       body: Stack(
         children: [
-          // Gradient background
           Container(
             decoration: const BoxDecoration(
-              gradient: AppColors.primaryGradient,
+              gradient: AppGradients.sunriseAccent,
             ),
           ),
-          
-          // Content
           SafeArea(
-            child: Column(
-              children: [
-                // Close button
-                Align(
-                  alignment: Alignment.topRight,
-                  child: IconButton(
-                    onPressed: () => context.go('/review'),
-                    icon: const Icon(Icons.close, color: Colors.white),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Spacer(),
+                      IconButton(
+                        onPressed: () => context.go('/review'),
+                        icon: const Icon(Icons.close_rounded, color: Colors.white),
+                      ),
+                    ],
                   ),
-                ),
-                
-                const Spacer(),
-                
-                // Grade
-                Text(
-                  grade,
-                  style: GoogleFonts.playfairDisplay(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                
-                const SizedBox(height: 16),
-                
-                // Deck name
-                if (widget.deckName != null)
+                  const Spacer(),
                   Text(
-                    widget.deckName!,
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      color: Colors.white70,
+                    headline,
+                    style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                      color: Colors.white,
                     ),
+                    textAlign: TextAlign.center,
                   ),
-                
-                const SizedBox(height: 40),
-                
-                // Accuracy circle
-                Container(
-                  width: 180,
-                  height: 180,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.2),
-                  ),
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '${accuracy.toInt()}%',
-                          style: GoogleFonts.inter(
-                            fontSize: 48,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          'Độ chính xác',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    supportingCopy,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.92),
                     ),
+                    textAlign: TextAlign.center,
                   ),
-                ),
-                
-                const SizedBox(height: 40),
-                
-                // Stats row
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildStatItem(
-                        value: widget.totalCards.toString(),
-                        label: 'Tổng thẻ',
-                        icon: Icons.style,
+                  if (widget.deckName != null && widget.deckName!.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.lg),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
                       ),
-                      _buildStatItem(
-                        value: widget.correctCards.toString(),
-                        label: 'Đúng',
-                        icon: Icons.check_circle,
-                        color: AppColors.success,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(999),
                       ),
-                      _buildStatItem(
-                        value: widget.incorrectCards.toString(),
-                        label: 'Sai',
-                        icon: Icons.cancel,
-                        color: AppColors.error,
+                      child: Text(
+                        widget.deckName!,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: Colors.white,
+                        ),
                       ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // Time spent
-                if (widget.timeSpentSeconds > 0)
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.huge),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    width: 196,
+                    height: 196,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(20),
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.14),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        width: 2,
+                      ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.timer, color: Colors.white70, size: 18),
-                        const SizedBox(width: 8),
-                        Text(
-                          _formatTime(widget.timeSpentSeconds),
-                          style: GoogleFonts.inter(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w500,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '${accuracy.round()}%',
+                            style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                              color: Colors.white,
+                            ),
                           ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            S.of(context).t('summary_accuracy'),
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.88),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.huge),
+                  ModernCard(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.96),
+                        Colors.white.withValues(alpha: 0.88),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _SummaryMetric(
+                                value: '${widget.totalCards}',
+                                label: S.of(context).t('summary_total'),
+                                color: AppColors.info,
+                                icon: Icons.style_rounded,
+                              ),
+                            ),
+                            Expanded(
+                              child: _SummaryMetric(
+                                value: '${widget.correctCards}',
+                                label: S.of(context).t('summary_correct'),
+                                color: AppColors.success,
+                                icon: Icons.check_circle_rounded,
+                              ),
+                            ),
+                            Expanded(
+                              child: _SummaryMetric(
+                                value: '${widget.incorrectCards}',
+                                label: S.of(context).t('summary_wrong'),
+                                color: AppColors.error,
+                                icon: Icons.cancel_rounded,
+                              ),
+                            ),
+                          ],
                         ),
+                        if (widget.timeSpentSeconds > 0) ...[
+                          const SizedBox(height: AppSpacing.xl),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceAlt,
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.schedule_rounded,
+                                  size: 18,
+                                  color: scoreColor,
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: Text(
+                                    '${S.of(context).t("summary_time")} ${_formatTime(widget.timeSpentSeconds)}',
+                                    style: Theme.of(context).textTheme.bodyMedium,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                
-                const Spacer(),
-                
-                // Action buttons
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      // Continue learning
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            // Start new session
-                            context.pop();
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: AppColors.primaryStart,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: Text(
-                            'Học tiếp',
-                            style: GoogleFonts.inter(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
+                  const Spacer(),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => context.pop(),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppColors.primary,
                       ),
-                      
-                      const SizedBox(height: 12),
-                      
-                      // Done
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton(
-                          onPressed: () => context.go('/review'),
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Colors.white),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: Text(
-                            'Hoàn thành',
-                            style: GoogleFonts.inter(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                      child: Text(S.of(context).t('summary_continue')),
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: AppSpacing.md),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () => context.go('/review'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white),
+                      ),
+                      child: Text(S.of(context).t('summary_back_to_review')),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          
-          // Confetti
           Align(
             alignment: Alignment.topCenter,
             child: ConfettiWidget(
@@ -278,11 +278,11 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
               blastDirectionality: BlastDirectionality.explosive,
               shouldLoop: false,
               colors: const [
-                Colors.green,
-                Colors.blue,
-                Colors.pink,
-                Colors.orange,
-                Colors.purple,
+                Colors.white,
+                Color(0xFFFFF3B0),
+                Color(0xFFFFD6A5),
+                Color(0xFFCDEAC0),
+                Color(0xFFBDE0FE),
               ],
             ),
           ),
@@ -291,31 +291,48 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
     );
   }
 
-  Widget _buildStatItem({
-    required String value,
-    required String label,
-    required IconData icon,
-    Color color = Colors.white,
-  }) {
+  Color _scoreColor() {
+    if (accuracy >= 70) return AppColors.success;
+    if (accuracy >= 50) return AppColors.warning;
+    return AppColors.primary;
+  }
+}
+
+class _SummaryMetric extends StatelessWidget {
+  final String value;
+  final String label;
+  final Color color;
+  final IconData icon;
+
+  const _SummaryMetric({
+    required this.value,
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       children: [
-        Icon(icon, color: color, size: 28),
-        const SizedBox(height: 8),
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(icon, color: color),
+        ),
+        const SizedBox(height: AppSpacing.sm),
         Text(
           value,
-          style: GoogleFonts.inter(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            color: color,
           ),
         ),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            color: Colors.white70,
-          ),
-        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
   }

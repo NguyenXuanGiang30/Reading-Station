@@ -5,7 +5,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
-import '../../models/user.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
@@ -21,6 +20,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   })  : _authService = authService ?? AuthService(),
         _apiService = apiService ?? ApiService(),
         super(const AuthInitial()) {
+    ApiService.setTokenRefreshCallback(
+      onTokenExpired: () {
+        if (!isClosed) {
+          add(AuthLogoutRequested());
+        }
+      },
+    );
+
     on<AuthCheckRequested>(_onCheckRequested);
     on<AuthLoginRequested>(_onLoginRequested);
     on<AuthGoogleLoginRequested>(_onGoogleLoginRequested);
@@ -188,5 +195,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   Future<void> resetOnboarding() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_onboardingKey);
+  }
+
+  @override
+  Future<void> close() {
+    ApiService.setTokenRefreshCallback();
+    return super.close();
   }
 }
